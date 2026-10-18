@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mustafa: The Dinosaur Wars</title>
+<meta name="description" content="A tribute to the 2002 Mustafa arcade craze: a dinosaur-age beat 'em up with original art.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;900&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --gold: #d4af37; --gold-hi: #f7e08a; --gold-lo: #8a6514; --ink: #07060a; --text: #f4ead2; --muted: #b8a780; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; font-family: Cinzel, Georgia, serif; color: var(--text); }
+  canvas { display: block; outline: none; box-shadow: 0 0 120px rgba(212,175,55,.08); }
+
+  .modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10;
+    background: rgba(5,3,8,.72); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: opacity .25s; }
+  .modal.hidden { opacity: 0; pointer-events: none; }
+  .card { position: relative; width: min(780px, 100%); max-height: 100%; overflow: auto; text-align: center;
+    background: radial-gradient(120% 80% at 50% 0%, #2c1e0f 0%, #130d08 55%, #0a0806 100%);
+    border: 1px solid var(--gold); border-radius: 20px; padding: 34px 34px 26px;
+    box-shadow: 0 0 0 1px #000, 0 0 0 7px rgba(212,175,55,.12), 0 30px 90px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,240,200,.15);
+    transform: translateY(0); transition: transform .3s; }
+  .modal.hidden .card { transform: translateY(16px); }
+  .close { position: absolute; top: 12px; right: 14px; width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(212,175,55,.4); color: var(--gold-hi); font-size: 20px; line-height: 1; }
+  .close:hover { background: rgba(212,175,55,.15); }
+  .crown { filter: drop-shadow(0 4px 18px rgba(255,190,80,.45)); }
+  h2 { margin: 6px 0 4px; font-family: "Cinzel Decorative", Cinzel, serif; font-weight: 900; font-size: 34px; letter-spacing: .04em;
+    background: linear-gradient(#fff7d1, #f3cf6a 40%, #b8860b 60%, #f7dc83 80%, #8a5a0b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tag { margin: 0 0 20px; color: var(--muted); font-weight: 600; letter-spacing: .06em; }
+  .perks { list-style: none; padding: 0; margin: 0 auto 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 22px; max-width: 600px; text-align: left; }
+  .perks li { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; font-size: 15px; line-height: 1.35; }
+  .perks li::before { content: "\25C6"; color: var(--gold); flex: none; font-size: 12px; margin-top: 3px; }
+  .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+  .plan { position: relative; cursor: pointer; padding: 20px 10px 16px; border-radius: 14px; font-family: inherit; color: var(--text);
+    background: linear-gradient(#1e150c, #0e0a07); border: 1px solid rgba(212,175,55,.3); transition: transform .15s, border-color .15s, box-shadow .15s; }
+  .plan:hover { transform: translateY(-2px); border-color: rgba(212,175,55,.7); }
+  .plan[aria-pressed="true"] { border: 2px solid var(--gold); box-shadow: 0 0 28px rgba(212,175,55,.3), inset 0 0 20px rgba(212,175,55,.08); }
+  .plan b { display: block; font-size: 15px; letter-spacing: .12em; color: var(--muted); }
+  .plan .price { display: block; margin: 6px 0 2px; font-family: Teko, sans-serif; font-weight: 600; font-size: 46px; line-height: 1; color: var(--gold-hi); }
+  .plan small { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .plan em { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-style: normal; font-weight: 700; font-size: 11px;
+    letter-spacing: .1em; padding: 3px 10px; border-radius: 20px; color: #1a0f02; background: linear-gradient(#fff1b0, #d4af37); }
+  .cta { width: 100%; padding: 16px; border-radius: 40px; cursor: pointer; font-family: inherit; font-weight: 900; font-size: 18px; letter-spacing: .08em;
+    color: #1a0f02; border: 1px solid #fff1b0; background: linear-gradient(#fff3c4, #e8c35a 45%, #b8860b 55%, #f2d27a);
+    box-shadow: 0 8px 30px rgba(212,175,55,.35); transition: filter .15s, transform .15s; }
+  .cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .cta:disabled { filter: grayscale(.4) brightness(.8); cursor: wait; }
+  .cta.ghost { background: transparent; color: var(--gold-hi); border-color: rgba(212,175,55,.6); box-shadow: none; }
+  .fine { margin: 14px 0 0; font-size: 12px; color: #8f8063; line-height: 1.5; font-family: Georgia, serif; }
+  .fine code { color: var(--gold-hi); }
+  .linkbtn { background: none; border: 0; color: #a08f6a; text-decoration: underline; cursor: pointer; font-family: inherit; margin-top: 14px; }
+  .success h3, .active-view h3 { font-size: 26px; margin: 8px 0; color: var(--gold-hi); }
+  .success p, .active-view p { color: var(--muted); font-weight: 600; margin: 0 0 20px; }
+  /* ----- Online hub ----- */
+  .hub { position: relative; width: min(1240px, 100%); height: min(760px, 100%); display: flex; flex-direction: column; text-align: left;
+    background: radial-gradient(120% 80% at 50% 0%, #2c1e0f 0%, #130d08 55%, #0a0806 100%); border: 1px solid var(--gold); border-radius: 18px;
+    box-shadow: 0 0 0 7px rgba(212,175,55,.1), 0 30px 90px rgba(0,0,0,.75); overflow: hidden; font-family: Cinzel, Georgia, serif; }
+  .hub header { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid rgba(212,175,55,.3); }
+  .hub header h2 { margin: 0; font-size: 26px; }
+  .hub .status { font-size: 12px; font-weight: 700; letter-spacing: .08em; padding: 4px 10px; border-radius: 20px; background: rgba(255,255,255,.06); }
+  .hub .status.online { color: #7dff9a; } .hub .status.connecting { color: #ffd56b; } .hub .status.offline { color: #ff8a7a; }
+  .hub .close { position: static; margin-left: auto; }
+  .hub .cols { flex: 1; display: grid; grid-template-columns: 300px 1fr 300px; min-height: 0; }
+  .hub .col { overflow: auto; padding: 14px 16px; border-right: 1px solid rgba(212,175,55,.15); }
+  .hub .col.right { border-right: 0; display: flex; }
+  .hub section { margin-bottom: 18px; }
+  .hub h4 { margin: 0 0 8px; font-size: 13px; letter-spacing: .14em; color: var(--muted); }
+  .hub h3 { margin: 0; color: var(--gold-hi); font-size: 24px; } .hub .sub { margin: 4px 0 12px; color: var(--muted); font-size: 13px; }
+  .hub .list { list-style: none; margin: 0; padding: 0; }
+  .hub .list li { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; font-size: 14px; }
+  .hub .list li:nth-child(odd) { background: rgba(255,255,255,.025); }
+  .hub .list li .nm { font-weight: 700; color: var(--text); }
+  .hub .list li small { color: var(--muted); font-size: 11px; margin-right: auto; }
+  .hub .list li .busy { margin-right: 0; color: #ffb07a; }
+  .hub .list .empty { color: #8f8063; font-style: italic; justify-content: center; }
+  .hub .chans li { cursor: pointer; } .hub .chans li.cur { background: rgba(212,175,55,.18) !important; color: var(--gold-hi); }
+  .hub .chans li small { margin-left: auto; margin-right: 0; }
+  .hub .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block; }
+  .hub .dot.on { background: #4ade80; box-shadow: 0 0 8px #4ade80; } .hub .dot.busy { background: #fbbf24; } .hub .dot.off { background: #555; }
+  .hub .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .hub .row label { width: 64px; color: var(--muted); font-size: 13px; }
+  .hub input, .hub select { flex: 1; min-width: 0; background: #0c0907; color: var(--text); border: 1px solid rgba(212,175,55,.35); border-radius: 8px; padding: 8px 10px; font: 600 14px Georgia, serif; }
+  .hub input:focus, .hub select:focus { outline: none; border-color: var(--gold); }
+  .hub .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .hub .chip, .hub .mini, .hub .tab { cursor: pointer; font: 700 12px Cinzel, serif; letter-spacing: .04em; border-radius: 20px; padding: 6px 12px; color: #1a0f02;
+    border: 1px solid #fff1b0; background: linear-gradient(#fff3c4, #e8c35a 45%, #b8860b 55%, #f2d27a); white-space: nowrap; }
+  .hub .chip { background: transparent; color: var(--text); border-color: rgba(212,175,55,.4); }
+  .hub .chip.sel { background: linear-gradient(#fff3c4, #e8c35a 45%, #b8860b 55%, #f2d27a); color: #1a0f02; }
+  .hub .mini.ghost, .hub .tab { background: transparent; color: var(--gold-hi); border-color: rgba(212,175,55,.45); }
+  .hub .tab.sel { background: rgba(212,175,55,.2); }
+  .hub .create { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 10px; }
+  .hub .create .cta, .hub .actions .cta { width: auto; padding: 10px 20px; font-size: 14px; }
+  .hub .actions { display: flex; gap: 10px; margin-top: 14px; }
+  .hub .sides { margin-top: 10px; } .hub .sides.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hub .side { border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 10px; }
+  .hub .side.sA { border-color: rgba(255,90,70,.6); } .hub .side.sB { border-color: rgba(74,160,255,.6); }
+  .hub .side h5 { margin: 0 0 6px; font-size: 15px; } .hub .side.sA h5 { color: #ff8a7a; } .hub .side.sB h5 { color: #8ac4ff; }
+  .hub .slot .ok { color: #7dff9a; font-weight: 700; font-size: 12px; margin-left: auto; } .hub .slot .wait { color: #8f8063; font-size: 12px; margin-left: auto; }
+  .hub .hint { color: #8f8063; font-size: 12px; margin-top: 14px; font-family: Georgia, serif; }
+  .hub .teamhead { display: flex; justify-content: space-between; color: var(--gold-hi); margin-bottom: 6px; }
+  .hub .chat { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; }
+  .hub .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .hub .msgs { flex: 1; overflow: auto; background: rgba(0,0,0,.25); border-radius: 10px; padding: 8px 10px; font: 14px Georgia, serif; min-height: 120px; }
+  .hub .msg { margin: 4px 0; line-height: 1.35; } .hub .msg b { color: var(--gold-hi); } .hub .msg b.me { color: #7dff9a; }
+  .hub .invites { padding: 8px 20px; display: flex; flex-direction: column; gap: 6px; background: rgba(212,175,55,.12); border-bottom: 1px solid rgba(212,175,55,.3); }
+  .hub .invite { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  #toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 30; pointer-events: none; }
+  .toast { background: rgba(20,12,6,.95); color: var(--text); border: 1px solid var(--gold); border-radius: 30px; padding: 10px 20px; font: 700 14px Cinzel, serif;
+    box-shadow: 0 10px 30px rgba(0,0,0,.6); transition: opacity .5s, transform .5s; }
+  .toast.out { opacity: 0; transform: translateY(10px); }
+  @media (max-width: 900px) { .hub .cols { grid-template-columns: 1fr; overflow: auto; } .hub .col { border-right: 0; overflow: visible; } }
+  button:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; }
+  @media (max-width: 640px) {
+    .card { padding: 26px 18px 20px; }
+    h2 { font-size: 26px; }
+    .perks { grid-template-columns: 1fr; }
+    .plans { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game" tabindex="0" aria-label="Mustafa: The Dinosaur Wars — use the keyboard to play"></canvas>
+
+<div id="royal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="royalTitle">
+  <div class="card">
+    <button class="close" data-close aria-label="Close">&times;</button>
+    <svg class="crown" viewBox="0 0 64 48" width="72" height="54" aria-hidden="true">
+      <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4c2"/><stop offset=".5" stop-color="#e3b84a"/><stop offset="1" stop-color="#8a5f12"/></linearGradient></defs>
+      <path d="M4 40 L8 12 L20 26 L32 6 L44 26 L56 12 L60 40 Z" fill="url(#cg)" stroke="#3a2606" stroke-width="2" stroke-linejoin="round"/>
+      <rect x="4" y="40" width="56" height="6" rx="2" fill="url(#cg)" stroke="#3a2606" stroke-width="2"/>
+      <circle cx="32" cy="6" r="3.5" fill="#e0475b"/><circle cx="8" cy="12" r="3" fill="#3fa7e0"/><circle cx="56" cy="12" r="3" fill="#3fa7e0"/>
+    </svg>
+    <h2 id="royalTitle">ROYAL PASS</h2>
+
+    <div class="plans-view">
+      <p class="tag">Unlock the full legend of Mustafa</p>
+      <ul class="perks">
+        <li>Unlimited continues — pick up right where you fell</li>
+        <li>5 lives per credit instead of 3</li>
+        <li>Royal golden aura for every hero</li>
+        <li>Stage select — jump to any of the 5 stages</li>
+        <li>Golden aura and a crown on your HUD</li>
+        <li>Support new stages and heroes</li>
+      </ul>
+      <div class="plans">
+        <button class="plan" data-plan="monthly" aria-pressed="false"><b>MONTHLY</b><span class="price">৳149</span><small>per month</small></button>
+        <button class="plan" data-plan="yearly" aria-pressed="true"><em>BEST VALUE · SAVE 44%</em><b>YEARLY</b><span class="price">৳999</span><small>per year</small></button>
+        <button class="plan" data-plan="lifetime" aria-pressed="false"><b>LIFETIME</b><span class="price">৳1,999</span><small>one time</small></button>
+      </div>
+      <button id="subscribeBtn" class="cta">Subscribe</button>
+      <p class="fine">Demo checkout: no payment is taken and nothing is charged. Connect a real provider (Stripe, bKash, SSLCommerz) in <code>startCheckout()</code> inside <code>js/royal.js</code>.</p>
+    </div>
+
+    <div class="success" hidden>
+      <h3>Welcome to the Royal Court</h3>
+      <p>Royal costumes, 5 lives and unlimited continues are now unlocked.</p>
+      <button class="cta" data-close>Back to the fight</button>
+    </div>
+
+    <div class="active-view" hidden>
+      <h3>Your Royal Pass is active</h3>
+      <p id="activePlan"></p>
+      <button class="cta ghost" data-close>Back to the fight</button>
+      <div><button class="linkbtn" id="cancelSub">Cancel subscription</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="online" class="modal hidden" role="dialog" aria-modal="true" aria-label="Online arena"><div class="hub"></div></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/music.js"></script>
+<script src="js/data.js"></script>
+<script src="assets/sprites/atlas.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/art.js"></script>
+<script src="js/bg.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/royal.js"></script>
+<script src="js/arena.js"></script>
+<script src="js/net.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

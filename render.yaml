@@ -1,0 +1,9 @@
+# One-click deploy of the MUSTAFA game + online server on Render (https://render.com)
+services:
+  - type: web
+    name: mustafa-game
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health

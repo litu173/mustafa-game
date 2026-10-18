@@ -1,0 +1,14 @@
+{
+  "name": "mustafa-game",
+  "version": "1.0.0",
+  "description": "MUSTAFA: The Dinosaur Wars — arcade beat 'em up with online duels and team battles",
+  "private": true,
+  "scripts": {
+    "start": "node server/server.js",
+    "slice": "node tools/slice.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,5 @@
+node_modules/
+server/data/
+.DS_Store
+# AI-generated source sheets (kept in the Figma file "Mustafa Game Art"); the sliced atlases in assets/sprites are committed
+assets/raw/
