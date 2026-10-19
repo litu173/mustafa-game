@@ -40,6 +40,7 @@ function loadSprites() {
     im.onerror = () => { SPR.total--; };
     im.src = 'assets/sprites/' + name + '.png';
   }
+  { const im = new Image(); SPR.total++; im.onload = () => { SPR.logo = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/logo.png?v=1'; }
   for (const t of ['sea', 'swamp', 'road', 'garage', 'village', 'lab', 'jungle', 'fortress', 'cover']) {
     const im = new Image(); SPR.total++;
     im.onload = () => { if (t === 'cover') SPR.cover = im; else SPR.bg[t] = im; SPR.loaded++; };

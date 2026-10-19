@@ -1,4 +1,6 @@
-# MUSTAFA: The Dinosaur Wars
+# MUSTAFA REBORN
+
+![Mustafa Reborn](assets/logo.png)
 
 A tribute to the 2002 arcade craze: a side-scrolling beat 'em up with dinosaurs, a car chase stage,
 six bosses, and **online duels, free-for-alls and team-vs-team battles**.

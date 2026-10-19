@@ -28,17 +28,23 @@ function buildLogo() {
   LOGO = o;
   SHINE = document.createElement('canvas'); SHINE.width = cw; SHINE.height = ch;
 }
-function drawLogo(c, cx, cy, scale) {
+// The MUSTAFA REBORN logo (painted art in assets/logo.png), drawn by width with a light sweep across it.
+function drawLogo(c, cx, cy, width) {
+  if (SPR.logo && LOGO !== SPR.logo) {
+    LOGO = SPR.logo; SHINE = document.createElement('canvas'); SHINE.width = LOGO.width; SHINE.height = LOGO.height;
+  }
   if (!LOGO) return;
+  const scale = width / LOGO.width;
   const sc = SHINE.getContext('2d');
   sc.globalCompositeOperation = 'source-over'; sc.clearRect(0, 0, SHINE.width, SHINE.height); sc.drawImage(LOGO, 0, 0);
   sc.globalCompositeOperation = 'source-atop';
-  const px = ((G.t * 7) % 2600) - 400;
+  const px = ((G.t * 7) % (SHINE.width * 2.4)) - SHINE.width * 0.35;
   const g = sc.createLinearGradient(px - 90, 0, px + 90, 0);
-  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,240,0.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,240,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
   sc.save(); sc.transform(1, 0, -0.4, 1, 0, 0); sc.fillStyle = g; sc.fillRect(px - 90, 0, 180 + SHINE.height, SHINE.height); sc.restore();
   const w = LOGO.width * scale, h = LOGO.height * scale;
-  c.save(); c.globalCompositeOperation = 'lighter'; glow(c, cx, cy, w * 0.42, 'rgba(255,120,60,0.22)'); c.restore();
+  c.save(); c.globalCompositeOperation = 'lighter'; glow(c, cx, cy, w * 0.5, 'rgba(255,110,40,0.18)'); c.restore();
+  if (LOGO !== SPR.logo) txt(c, 'REBORN', cx, cy + h / 2 + 30 * scale * 4, { font: `900 ${Math.round(160 * scale)}px Cinzel, serif`, align: 'center', fill: '#ff5a2a', stroke: '#120800', sw: 5 });
   c.drawImage(SHINE, cx - w / 2, cy - h / 2, w, h);
 }
 
@@ -94,8 +100,7 @@ function drawTitle(c) {
   for (const [i, x, y, s, f] of line4) drawFigure(c, heroLook(i), poseFor(i, 'idle', t), x, y, f, s, { t });
   drawFigure(c, heroLook(0), poseFor(0, 'idle', t, { weapon: 'rifle' }), 470, 718, 1, 1.85, { t, weapon: 'rifle', aura: Save.d.premium && G.royal ? '#d4af37' : null });
   const bob = Math.sin(t * 0.03) * 3;
-  drawLogo(c, W / 2, 118 + bob, 0.86);
-  txt(c, '—  THE DINOSAUR WARS  —', W / 2, 234 + bob, { font: '700 24px Cinzel, serif', align: 'center', fill: goldGrad(c, 214, 238), stroke: '#1a0a02', sw: 5 });
+  drawLogo(c, W / 2, 150 + bob, 460);
   const rib = Save.d.premium ? '♛  ROYAL MEMBER  ♛' : 'ARCADE LEGEND · ROYAL EDITION';
   c.save(); c.translate(W / 2, 270 + bob);
   c.fillStyle = 'rgba(0,0,0,0.5)'; rrect(c, -170, -16, 340, 30, 15); c.fill();
@@ -431,10 +436,10 @@ function drawEnding(c) {
     const shade = c.createLinearGradient(0, 0, 0, H); shade.addColorStop(0, 'rgba(0,0,0,0.65)'); shade.addColorStop(0.45, 'rgba(0,0,0,0.1)'); shade.addColorStop(1, 'rgba(0,0,0,0.3)');
     c.fillStyle = shade; c.fillRect(0, 0, W, H);
     c.save(); c.globalAlpha = Math.min(1, k / 60);
-    drawLogo(c, W / 2, 80, 0.55);
-    txt(c, 'THE LEGEND RETURNS', W / 2, 170, { font: '900 40px Cinzel, serif', align: 'center', fill: goldGrad(c, 138, 174), stroke: '#120800', sw: 6 });
-    txt(c, 'Dr. Kaiser is defeated. The dinosaurs roam free once more.', W / 2, 206, { font: '600 20px Cinzel, serif', align: 'center', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.7)', sw: 4 });
-    txt(c, 'FINAL SCORE  ' + String(G.score).padStart(8, '0'), W / 2, 248, { font: '600 40px Teko, sans-serif', align: 'center', fill: '#fff4d6', stroke: '#120800', sw: 5 });
+    drawLogo(c, W / 2, 130, 400);
+    txt(c, 'THE LEGEND RETURNS', W / 2, 290, { font: '900 40px Cinzel, serif', align: 'center', fill: goldGrad(c, 138, 174), stroke: '#120800', sw: 6 });
+    txt(c, 'Dr. Kaiser is defeated. The dinosaurs roam free once more.', W / 2, 326, { font: '600 20px Cinzel, serif', align: 'center', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.7)', sw: 4 });
+    txt(c, 'FINAL SCORE  ' + String(G.score).padStart(8, '0'), W / 2, 368, { font: '600 40px Teko, sans-serif', align: 'center', fill: '#fff4d6', stroke: '#120800', sw: 5 });
     c.restore();
     if (k > 200 && (k >> 4) % 2) txt(c, TOUCH ? 'TAP TO CONTINUE' : 'PRESS ENTER', W / 2, 700, { font: '700 20px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
     drawEmbers(c);
@@ -456,7 +461,7 @@ function drawEnding(c) {
   });
   const a = Math.min(1, k / 60);
   c.save(); c.globalAlpha = a;
-  drawLogo(c, W / 2, 110, 0.62);
+  drawLogo(c, W / 2, 110, 360);
   txt(c, 'THE LEGEND RETURNS', W / 2, 212, { font: '900 40px Cinzel, serif', align: 'center', fill: goldGrad(c, 180, 216), stroke: '#120800', sw: 6 });
   txt(c, 'Dr. Kaiser is defeated. The dinosaurs roam free once more.', W / 2, 252, { font: '600 20px Cinzel, serif', align: 'center', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.5)', sw: 4 });
   txt(c, 'FINAL SCORE  ' + String(G.score).padStart(8, '0'), W / 2, 298, { font: '600 40px Teko, sans-serif', align: 'center', fill: '#fff4d6', stroke: '#120800', sw: 5 });
@@ -466,21 +471,24 @@ function drawEnding(c) {
 }
 
 /* ---------- Cover title (painted poster) ---------- */
-function coverImage(c, t) {
-  const im = SPR.cover, z = (1.04 + Math.sin(t * 0.004) * 0.02) * Math.max(W / im.width, H / im.height);
+function coverImage(c, t, lower = 0) {   // lower: push the heroes down to leave sky for the logo
+  const im = SPR.cover, z = (1.04 + lower / 380 + Math.sin(t * 0.004) * 0.02) * Math.max(W / im.width, H / im.height);
   const w = im.width * z, h = im.height * z;
-  c.drawImage(im, (W - w) / 2, (H - h) / 2 - 6, w, h);
+  c.drawImage(im, (W - w) / 2, Math.min(0, (H - h) / 2 - 6 + lower), w, h);
 }
 function drawTitleCover(c) {
   const t = G.t;
-  coverImage(c, t);
+  coverImage(c, t, 54);
   const top = c.createLinearGradient(0, 0, 0, 260); top.addColorStop(0, 'rgba(10,4,12,0.75)'); top.addColorStop(1, 'rgba(10,4,12,0)');
   c.fillStyle = top; c.fillRect(0, 0, W, 260);
   const bot = c.createLinearGradient(0, 560, 0, H); bot.addColorStop(0, 'rgba(8,4,6,0)'); bot.addColorStop(0.55, 'rgba(8,4,6,0.8)'); bot.addColorStop(1, 'rgba(8,4,6,0.95)');
   c.fillStyle = bot; c.fillRect(0, 560, W, H - 560);
   const bob = Math.sin(t * 0.03) * 3;
-  drawLogo(c, W / 2, 92 + bob, 0.74);
-  txt(c, '\u2014  THE DINOSAUR WARS  \u2014', W / 2, 190 + bob, { font: '700 24px Cinzel, serif', align: 'center', fill: goldGrad(c, 170, 194), stroke: '#1a0a02', sw: 5 });
+  if (!G.titleReady) {   // splash: big centred logo over a darkened cover
+    const v = c.createRadialGradient(W / 2, 300, 60, W / 2, 300, 620); v.addColorStop(0, 'rgba(0,0,0,0.55)'); v.addColorStop(1, 'rgba(0,0,0,0.15)');
+    c.fillStyle = v; c.fillRect(0, 0, W, H);
+    drawLogo(c, W / 2, 150 + bob, 500);
+  } else drawLogo(c, 34 + SAFE.l + 165, 112 + bob, 330);   // lobby: compact logo top-left, PUBG style
   if (!G.titleReady) {
     const a = 0.55 + 0.45 * Math.sin(t * 0.08);
     c.save(); c.globalAlpha = a;
@@ -514,7 +522,7 @@ function drawTitleCover(c) {
     txt(c, 'LEVEL · ' + DIF().name + '   ·   ' + (Save.d.premium ? '♛ ROYAL' : '3 FREE LIVES'), bx + bw / 2, by - 14, { font: '700 15px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
   }
   txt(c, 'HI-SCORE ' + String(Save.d.best).padStart(7, '0'), W - 28, 40, { font: '600 26px Teko, sans-serif', align: 'right', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
-  txt(c, 'Fan-made tribute \u00B7 not affiliated with Capcom', 28, 36, { font: '600 12px Cinzel, serif', fill: 'rgba(240,220,180,0.7)' });
+  txt(c, 'Fan-made tribute \u00B7 not affiliated with Capcom', W / 2, H - 14, { font: '600 11px Cinzel, serif', align: 'center', fill: 'rgba(240,220,180,0.6)' });
   drawEmbers(c);
   c.strokeStyle = 'rgba(212,175,55,0.55)'; c.lineWidth = 2; c.strokeRect(10, 10, W - 20, H - 20);
   if (G.overlay === 'help') drawHelp(c);
