@@ -140,7 +140,6 @@ const Sound = {
     notes.forEach((f, i) => this.osc(type, f, 0, step * 2.2, vol, null, t + i * step));
   },
   play(name) {
-    if (typeof G !== 'undefined' && G.arena && G.arena.isHost) G.arena.events.push({ s: name });
     if (!this.ac) return;
     switch (name) {
       case 'punch': this.noise(0.09, 0.7, 'lowpass', 1600, 300); this.osc('sine', 170, 50, 0.12, 0.7); break;

@@ -51,7 +51,8 @@ const server = http.createServer((req, res) => {
 /* ---------- live state ---------- */
 const clients = new Map();   // id -> client
 const rooms = new Map();     // roomId -> room
-const send = (c, msg) => { if (c && c.ws.readyState === 1) c.ws.send(JSON.stringify(msg)); };
+const send = (c, msg) => { if (c && c.ws && c.ws.readyState === 1) c.ws.send(JSON.stringify(msg)); };
+const GRACE_MS = 20000;   // a dropped player keeps their place in a match this long
 const online = id => clients.has(id);
 const userName = id => (clients.get(id) || {}).name || (db.users[id] || {}).name || 'Player';
 const status = c => (c.room ? (rooms.get(c.room) && rooms.get(c.room).status === 'playing' ? 'in match' : 'in room') : 'idle');
@@ -84,9 +85,10 @@ function pushSocialAround(id) {
 }
 
 /* ---------- rooms ---------- */
-function roomSummary(r) { return { id: r.id, name: r.name, mode: r.mode, label: MODES[r.mode].label, count: r.players.length, max: MODES[r.mode].max, status: r.status, stage: r.stage }; }
+function roomSummary(r) { return { id: r.id, name: r.name, mode: r.mode, label: MODES[r.mode].label, count: r.players.length, max: MODES[r.mode].max, status: r.status, stage: r.stage, quick: !!r.quick,
+  teamNames: r.teamNames || null, players: r.players.map(p => ({ id: p.id, name: userName(p.id), hero: p.hero, side: p.side })) }; }
 function roomInfo(r) {
-  return { t: 'room', room: { id: r.id, name: r.name, mode: r.mode, label: MODES[r.mode].label, stage: r.stage, host: r.host, status: r.status, max: MODES[r.mode].max,
+  return { t: 'room', room: { id: r.id, name: r.name, mode: r.mode, label: MODES[r.mode].label, stage: r.stage, host: r.host, status: r.status, max: MODES[r.mode].max, quick: !!r.quick, countdown: r.countdownAt ? Math.max(0, r.countdownAt - Date.now()) : 0,
     teamNames: r.teamNames || null, players: r.players.map(p => ({ id: p.id, name: userName(p.id), hero: p.hero, side: p.side, ready: p.ready })) } };
 }
 function pushRoom(r) { const info = roomInfo(r); for (const p of r.players) send(clients.get(p.id), info); broadcastChannel(r.channel); }
@@ -100,6 +102,24 @@ function pickSide(r, id) {
   if (r.teamSides) { const t = teamOf(id); if (t && r.teamSides[t]) return r.teamSides[t]; }
   const a = r.players.filter(p => p.side === 'A').length, b = r.players.filter(p => p.side === 'B').length;
   return a <= b ? 'A' : 'B';
+}
+// quick rooms start by themselves: duels when full, bigger modes after a short countdown
+function scheduleQuick(r) {
+  if (!r.quick || r.status !== 'open') return;
+  const full = r.players.length >= MODES[r.mode].max, enough = r.players.length >= 2 && (r.mode !== 'team' || new Set(r.players.map(p => p.side)).size === 2);
+  clearTimeout(r.quickTimer); r.countdownAt = 0;
+  if (!enough) { pushRoom(r); return; }
+  const delay = full || r.mode === 'duel' ? 3500 : 12000;
+  r.countdownAt = Date.now() + delay;
+  r.quickTimer = setTimeout(() => { if (rooms.get(r.id) === r && r.status === 'open' && r.players.length >= 2) startRoom(r); }, delay);
+  pushRoom(r);
+}
+function startRoom(r) {
+  r.status = 'playing'; r.countdownAt = 0;
+  r.startMsg = { t: 'start', roomId: r.id, mode: r.mode, stage: r.stage, host: r.host, seed: uid(4), teamNames: r.teamNames || null,
+    players: r.players.map(p => ({ id: p.id, name: userName(p.id), hero: p.hero, side: p.side })) };
+  for (const p of r.players) send(clients.get(p.id), r.startMsg);
+  pushRoom(r); for (const p of r.players) pushSocialAround(p.id);
 }
 function joinRoom(c, r) {
   if (c.room === r.id) return pushRoom(r);
@@ -118,8 +138,10 @@ function leaveRoom(c) {
   if (r.status === 'playing') for (const p of r.players) send(clients.get(p.id), { t: 'left', id: c.id, host: r.host === c.id });
   if (!r.players.length) { rooms.delete(r.id); broadcastChannel(r.channel); }
   else {
-    if (r.host === c.id) { r.host = r.players[0].id; if (r.status === 'playing') { r.status = 'open'; for (const p of r.players) { p.ready = false; send(clients.get(p.id), { t: 'aborted', text: 'The host left the match.' }); } } }
+    if (r.host === c.id) { r.host = r.players[0].id; if (r.status === 'playing') for (const p of r.players) send(clients.get(p.id), { t: 'host', id: r.host }); }
+    if (r.status === 'playing' && r.players.length < 2) { r.status = 'open'; for (const p of r.players) p.ready = false; }
     pushRoom(r);
+    scheduleQuick(r);
   }
   send(c, { t: 'room', room: null });
   pushSocialAround(c.id);
@@ -130,7 +152,18 @@ const handlers = {
   hello(c, m) {
     let id = String(m.id || ''), user = db.users[id];
     if (!user || user.token !== m.token) { id = uid(6); user = db.users[id] = { token: uid(12), name: '', friends: [], requests: [], team: null, teamInvites: [] }; }
-    if (clients.has(id)) { const old = clients.get(id); try { old.ws.close(4000, 'signed in elsewhere'); } catch (e) { /* ignore */ } cleanup(old); }
+    const prev = clients.get(id);
+    if (prev && !prev.ws) {                       // came back within the grace period: resume
+      clearTimeout(prev.graceTimer); prev.graceTimer = null; prev.ws = c.ws; c.resumed = prev;
+      send(prev, { t: 'welcome', you: { id, token: user.token, name: prev.name, hero: prev.hero }, channels: CHANNELS, modes: MODES });
+      const r = prev.room && rooms.get(prev.room);
+      if (r) { send(prev, roomInfo(r)); if (r.status === 'playing' && r.startMsg) { send(prev, { ...r.startMsg, t: 'resume', host: r.host }); for (const p of r.players) if (p.id !== id) send(clients.get(p.id), { t: 'lag', id, on: false }); } }
+      broadcastChannel(prev.channel); pushSocialAround(id);
+      return;
+    }
+    if (prev) {                                   // already open in another tab: this tab plays as a separate player
+      id = uid(6); user = db.users[id] = { token: uid(12), name: '', friends: [], requests: [], team: null, teamInvites: [] };
+    }
     c.id = id; c.name = clean(m.name) || user.name || 'Hero' + id.slice(0, 4); c.hero = HEROES.includes(m.hero) ? m.hero : 'mustafa';
     user.name = c.name; save();
     clients.set(id, c);
@@ -257,13 +290,24 @@ const handlers = {
     if (r.players.length < 2) return send(c, { t: 'toast', text: 'You need at least 2 players.' });
     if (r.mode === 'team' && new Set(r.players.map(p => p.side)).size < 2) return send(c, { t: 'toast', text: 'Both sides need at least one player.' });
     if (r.players.some(p => !p.ready && p.id !== r.host)) return send(c, { t: 'toast', text: 'Waiting for everyone to press Ready.' });
-    r.status = 'playing';
-    const start = { t: 'start', roomId: r.id, mode: r.mode, stage: r.stage, host: r.host, seed: uid(4), teamNames: r.teamNames || null,
-      players: r.players.map(p => ({ id: p.id, name: userName(p.id), hero: p.hero, side: p.side })) };
-    for (const p of r.players) send(clients.get(p.id), start);
-    pushRoom(r); for (const p of r.players) pushSocialAround(p.id);
+    startRoom(r);
   },
-  // host-authoritative netcode relay
+  // match traffic: each player owns their fighter and shares it with the room; the host referees items and the result
+  relay(c, m) {
+    const r = rooms.get(c.room); if (!r || r.status !== 'playing') return;
+    const msg = JSON.stringify({ t: 'relay', from: c.id, d: m.d });
+    for (const p of r.players) if (p.id !== c.id) { const o = clients.get(p.id); if (o && o.ws && o.ws.readyState === 1) o.ws.send(msg); }
+  },
+  toHost(c, m) { const r = rooms.get(c.room); if (r && r.status === 'playing') send(clients.get(r.host), { t: 'relay', from: c.id, d: m.d }); },
+  // one-click matchmaking: join an open quick room of this mode in the channel, or open one and wait
+  quick(c, m) {
+    const mode = m.mode === 'ffa' ? 'ffa' : m.mode === 'team' ? 'team' : 'duel';
+    let r = [...rooms.values()].find(x => x.quick && x.mode === mode && x.channel === c.channel && x.status === 'open' && x.players.length < MODES[mode].max && !x.players.some(p => p.id === c.id));
+    if (!r) r = createRoom(c, mode, `Quick ${MODES[mode].label}`, Math.floor(Math.random() * STAGE_COUNT), { quick: true });
+    joinRoom(c, r);
+    scheduleQuick(r);
+  },
+  // host-authoritative netcode relay (legacy)
   input(c, m) { const r = rooms.get(c.room); if (r && r.status === 'playing') send(clients.get(r.host), { t: 'input', from: c.id, d: m.d }); },
   state(c, m) {
     const r = rooms.get(c.room); if (!r || r.host !== c.id || r.status !== 'playing') return;
@@ -272,7 +316,7 @@ const handlers = {
   },
   matchEnd(c, m) {
     const r = rooms.get(c.room); if (!r || r.host !== c.id) return;
-    r.status = 'open'; for (const p of r.players) p.ready = false;
+    r.status = 'open'; r.startMsg = null; for (const p of r.players) p.ready = false;
     for (const p of r.players) send(clients.get(p.id), { t: 'matchEnd', result: m.result });
     pushRoom(r); for (const p of r.players) pushSocialAround(p.id);
   },
@@ -294,10 +338,21 @@ wss.on('connection', ws => {
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch (e) { return; }
     const h = handlers[m && m.t];
-    if (!h || (!c.id && m.t !== 'hello')) return;
-    try { h(c, m); } catch (e) { console.error('handler', m.t, e); }
+    if (!h || (!c.id && !c.resumed && m.t !== 'hello')) return;
+    try { h(c.resumed || c, m); } catch (e) { console.error('handler', m.t, e); }
   });
-  ws.on('close', () => cleanup(c));
+  ws.on('close', () => {
+    const owner = c.resumed || c;
+    if (owner.ws !== ws) return;                  // an older socket of a resumed player
+    const r = owner.room && rooms.get(owner.room);
+    if (owner.id && r && r.status === 'playing') {
+      owner.ws = null;
+      for (const p of r.players) if (p.id !== owner.id) send(clients.get(p.id), { t: 'lag', id: owner.id, on: true });
+      owner.graceTimer = setTimeout(() => { owner.graceTimer = null; cleanup(owner); }, GRACE_MS);
+      return;
+    }
+    cleanup(owner);
+  });
 });
 // drop dead connections
 setInterval(() => {

@@ -86,7 +86,7 @@ function explode(x, y, z, owner, dmg, radius) {
   for (let i = 0; i < 8; i++) addPart({ type: 'smoke', x: x + rand(-50, 50), y, z: z + rand(30, 120), vx: rand(-1, 1), vz: rand(1, 2.5), life: rand(50, 80), size: rand(40, 70) });
   addPart({ type: 'ring', x, y, z: 2, life: 22, size: radius * 1.2, color: '#ffd9a0', flat: true });
   debris(x, y, '#3a3028');
-  if (G.arena) netEvent({ f: 'ex', x: Math.round(x), y: Math.round(y), z: Math.round(z), r: radius });
+  if (G.arena && owner.mine) arenaSend({ k: 'ex', x: Math.round(x), y: Math.round(y), z: Math.round(z), r: radius });
   const list = owner.team === 'hero' ? (G.arena ? arenaFoes(owner) : G.enemies) : G.players.concat(G.enemies.filter(e => e !== owner && e.def.dino));
   for (const t of list) {
     if (!t.canBeHit) continue;
@@ -133,6 +133,7 @@ function hitArea(f, radius, depth, dmg, m) {
 }
 
 function damage(t, a, dmg, m = {}) {
+  if (G.arena && t.remote) return arenaHitRemote(t, a, dmg, m);   // online: the victim's own game applies it
   if (!t.canBeHit) return false;
   dmg = Math.max(1, Math.round(dmg));
   const dir = m.dir || Math.sign(t.x - a.x) || a.facing || 1;
@@ -144,11 +145,6 @@ function damage(t, a, dmg, m = {}) {
   G.hitstop = Math.max(G.hitstop, m.down ? 6 : 3);
   G.shake = Math.max(G.shake, m.shake || (m.down ? 7 : 3));
   Sound.play(m.down || dmg >= 14 ? 'heavy' : 'punch');
-  if (G.arena) {
-    t.lastHitBy = a.netId || (a.thrower && a.thrower.netId) || (a.owner && a.owner.netId);
-    netEvent({ f: 'sp', x: Math.round(t.x - dir * 14 * t.scale), y: Math.round(t.y), z: Math.round(hz), b: m.down ? 1 : 0 });
-    netEvent({ f: 'tx', x: Math.round(t.x), y: Math.round(t.y), z: Math.round(hz + 30), s2: String(dmg), c: '#ffe9a8', z2: 30 + Math.min(18, dmg) });
-  }
   if (heroHit) {
     G.combo++; G.comboT = 110; G.comboPop = 10; G.focus = t; G.focusT = 200;
     addScore(dmg * 10);
@@ -219,6 +215,7 @@ function spawnItem(kind, x, y, extra) {
 function weaponAmmo(kind) { return (GUNS[kind] || THROWN[kind] || {}).ammo || 0; }
 function dropWeapon(p) {
   if (!p.weapon) return;
+  if (G.arena) { p.weapon = null; return; }
   const k = p.weapon;
   if (MELEE_W[k] && p.wdur > 0) spawnItem(k, p.x, p.y, { wdur: p.wdur });
   else if ((GUNS[k] || THROWN[k]) && p.ammo > 0) spawnItem(k, p.x, p.y, { ammo: p.ammo });
@@ -263,7 +260,11 @@ function fire(f, kind) {
   const s = f.scale, dir = f.facing, x = f.x + dir * 70 * s, z = f.z + 124 * s;
   const hero = f.team === 'hero';
   const pw = hero ? f.def.power * (f.def.gunBonus || 1) : 1;
-  const P = o => G.projs.push(Object.assign({ x, y: f.y, z, team: f.team, owner: f, life: 90 }, o));
+  const P = o => {
+    const b = Object.assign({ x, y: f.y, z, team: f.team, owner: f, life: 90 }, o);
+    G.projs.push(b);
+    if (G.arena && f.mine) { b.id = 'p' + (++G.arena.projSeq); arenaSend({ k: 'pj', p: { id: b.id, kind: b.kind, x: Math.round(b.x), y: Math.round(b.y), z: Math.round(b.z), vx: b.vx, vy: b.vy || 0, vz: b.vz || 0, g: b.g || 0, life: b.life } }); }
+  };
   const muzzle = (sz = 40) => addPart({ type: 'flash', x: x + dir * 10, y: f.y, z, life: 5, size: sz, color: '#fff2b0' });
   const gun = GUNS[f.weapon], thr = THROWN[f.weapon];
   switch (kind) {
@@ -487,6 +488,7 @@ function nearWeapon(p) {
   return null;
 }
 function pickWeapon(p, it) {
+  if (G.arena && !it.granted) { arenaTake(it); return; }   // online: the host confirms who got it
   it.remove = true; p.weapon = it.kind;
   p.ammo = it.ammo || weaponAmmo(it.kind);
   if (MELEE_W[it.kind]) p.wdur = it.wdur || MELEE_W[it.kind].dur;
@@ -748,6 +750,12 @@ function bodyHit(t, b) {
 }
 function updateProjectiles() {
   for (const b of G.projs) {
+    if (b.remote) {   // another player's shot: drawn here, its hits are decided on their side
+      b.x += b.vx; if (b.vy) b.y += b.vy;
+      if (b.g) { b.z += b.vz; b.vz -= b.g; if (b.z <= 0) b.remove = true; }
+      if (--b.life <= 0) b.remove = true;
+      continue;
+    }
     b.x += b.vx; b.life--;
     if (b.vy) b.y += b.vy;
     if (b.g) {
@@ -770,7 +778,7 @@ function updateProjectiles() {
       if (Math.abs(t.x - b.x) < wx && Math.abs(t.y - b.y) < (t.state === 'drive' ? 50 : 30) && bodyHit(t, b)) {
         if (b.kind === 'rocket') explode(b.x, b.y, b.z * 0.5, b.owner, b.dmg, 190);
         else damage(t, b.owner, b.dmg, { kb: 3, dir: Math.sign(b.vx), down: !!b.down, kbx: 4, kbz: 6 });
-        b.remove = true; break;
+        b.remove = true; if (G.arena && b.id) arenaSend({ k: 'pjx', id: b.id }); break;
       }
     }
     if (b.team === 'hero' && !b.remove) for (const pr of G.props) {

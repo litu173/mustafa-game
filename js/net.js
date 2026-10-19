@@ -1,12 +1,17 @@
 'use strict';
 /* =========================================================
-   MUSTAFA — online client: connection, Online Hub UI
-   (profile, channels, players online, friends, teams, rooms,
-   chat, invites) and the hand-off into arena matches.
+   MUSTAFA — online client: connection + the Online Hub
+   (quick play, live fight cards, VS room, friends, teams, chat).
    ========================================================= */
 const HERO_NAMES = { mustafa: 'Mustafa', rakib: 'Rakib', nadia: 'Nadia', bablu: 'Bablu' };
-const MODE_INFO = { duel: 'Duel 1v1', ffa: 'Free-for-all (up to 4)', team: 'Team vs Team (up to 4v4)' };
+const HERO_ROLE = { mustafa: 'The Hunter', rakib: 'The Mechanic', nadia: 'The Diplomat', bablu: 'The Bulldozer' };
+const MODE_INFO = {
+  duel: { title: 'Quick Duel', short: 'DUEL', sub: '1 vs 1 · starts as soon as an opponent joins', icon: '⚔' },
+  ffa: { title: 'Free-for-all', short: 'FREE-FOR-ALL', sub: 'Up to 4 fighters · last one standing', icon: '☠' },
+  team: { title: 'Team Battle', short: 'TEAM BATTLE', sub: 'Up to 4 vs 4 · red team vs blue team', icon: '⚑' },
+};
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const stageImg = i => `assets/bg/${(STAGES[i] || STAGES[0]).theme}.jpg?v=3`;
 
 function serverURL() {
   const cfg = (window.MUSTAFA_SERVER || '').trim();
@@ -14,14 +19,32 @@ function serverURL() {
   if (location.protocol === 'file:') return 'ws://localhost:8137/ws';
   return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 }
+// ?lag=150 simulates a slow connection (ms each way) for testing the netcode
+const SIM_LAG = Math.max(0, +(new URLSearchParams(location.search).get('lag')) || 0);
 
 const Net = {
   ws: null, status: 'offline', me: { id: null, name: '', hero: 'mustafa' }, channel: null, channels: [], players: [], rooms: [],
   social: { friends: [], requests: [], team: null, teamInvites: [] }, room: null, chat: [], chatScope: 'channel', invites: [],
-  retry: 0, el: null, open: false,
+  retry: 0, el: null, open: false, tab: 'play', creating: false, newMode: 'duel', newStage: 0,
 
-  ident() { try { return JSON.parse(localStorage.getItem('mustafa.net') || '{}'); } catch (e) { return {}; } },
-  saveIdent(o) { try { localStorage.setItem('mustafa.net', JSON.stringify({ ...this.ident(), ...o })); } catch (e) { /* storage blocked */ } },
+  /* identity: each browser tab is its own player; the name/fighter preference is shared */
+  ident() {
+    try {
+      const tab = JSON.parse(sessionStorage.getItem('mustafa.tab') || 'null');
+      const saved = JSON.parse(localStorage.getItem('mustafa.net') || '{}');
+      return { ...saved, ...(tab || {}) };
+    } catch (e) { return {}; }
+  },
+  saveIdent(o) {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mustafa.net') || '{}');
+      if (o.name || o.hero) localStorage.setItem('mustafa.net', JSON.stringify({ ...saved, ...(o.name ? { name: o.name } : {}), ...(o.hero ? { hero: o.hero } : {}) }));
+      if (o.id) {
+        sessionStorage.setItem('mustafa.tab', JSON.stringify({ id: o.id, token: o.token }));
+        if (!saved.id || saved.id === o.id) localStorage.setItem('mustafa.net', JSON.stringify({ ...JSON.parse(localStorage.getItem('mustafa.net') || '{}'), id: o.id, token: o.token }));
+      }
+    } catch (e) { /* storage blocked */ }
+  },
 
   connect() {
     if (this.ws && this.ws.readyState <= 1) return;
@@ -32,32 +55,38 @@ const Net = {
     ws.onopen = () => {
       this.retry = 0; this.status = 'online';
       const id = this.ident();
-      this.send({ t: 'hello', id: id.id, token: id.token, name: id.name || '', hero: id.hero || HEROES[G.selIdx].id });
+      this.rawSend({ t: 'hello', id: id.id, token: id.token, name: id.name || '', hero: id.hero || HEROES[G.selIdx].id });
     };
-    ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } this.onMessage(m); };
+    ws.onmessage = ev => {
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (SIM_LAG) setTimeout(() => this.onMessage(m), SIM_LAG); else this.onMessage(m);
+    };
     ws.onclose = () => {
-      this.ws = null; this.status = 'offline'; this.room = null;
-      if (G.arena) { this.toast('Connection lost.'); endArena(); }
+      this.ws = null; this.status = 'offline';
+      if (!G.arena) this.room = null;
       this.render();
-      if (this.open) setTimeout(() => this.open && this.connect(), Math.min(10000, 1000 * 2 ** this.retry++));
+      // keep trying while the lobby is open or a match is running (the server holds our seat for 20 s)
+      if (this.open || G.arena) setTimeout(() => (this.open || G.arena) && this.connect(), Math.min(G.arena ? 1500 : 10000, 800 * 2 ** this.retry++));
     };
   },
-  send(m) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); },
+  rawSend(m) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); },
+  send(m) { if (SIM_LAG) setTimeout(() => this.rawSend(m), SIM_LAG); else this.rawSend(m); },
 
   onMessage(m) {
     switch (m.t) {
       case 'welcome': this.me = m.you; this.saveIdent({ id: m.you.id, token: m.you.token, name: m.you.name, hero: m.you.hero }); break;
       case 'channel': this.channel = m.name; this.players = m.players; this.rooms = m.rooms; this.channels = m.channels; break;
       case 'social': this.social = m; break;
-      case 'room': this.room = m.room; break;
+      case 'room': this.room = m.room; if (m.room) this.tab = 'play'; break;
       case 'chat': this.chat.push(m); if (this.chat.length > 120) this.chat.shift(); break;
       case 'toast': this.toast(m.text); break;
       case 'invite': this.invites.push(m); Sound.play('select'); break;
-      case 'start': this.hideHub(); startArena(m); return;
-      case 'input': if (G.arena && G.arena.isHost) { const ctl = G.arena.ctls.get(m.from); if (ctl) ctl.feed(m.d); } return;
-      case 'state': if (G.arena && !G.arena.isHost) applySnapshot(m.d); return;
-      case 'matchEnd': if (G.arena && !G.arena.isHost) showArenaResult(m.result); break;
-      case 'left': if (G.arena) { const f = G.players.find(p => p.netId === m.id); if (f) { f.setState('out'); this.toast(`${f.name} left the match.`); } } break;
+      case 'start': case 'resume': this.hideHub(); startArena(m); return;
+      case 'relay': if (G.arena) onArenaRelay(m.from, m.d); return;
+      case 'host': setArenaHost(m.id); return;
+      case 'lag': if (G.arena) { const f = fighterById(m.id); if (f) f.lagging = m.on; } return;
+      case 'matchEnd': if (G.arena) showArenaResult(m.result); break;
+      case 'left': if (G.arena) { const f = fighterById(m.id); if (f) { f.state = 'out'; f.stock = 0; this.toast(`${f.name} left the match.`); } } break;
       case 'aborted': if (G.arena) { this.toast(m.text); endArena(); } break;
     }
     this.render();
@@ -77,119 +106,189 @@ const Net = {
     setTimeout(() => d.classList.add('out'), 3200); setTimeout(() => d.remove(), 3800);
   },
 
-  /* ---------- UI rendering ---------- */
   init() {
     this.el = document.getElementById('online');
     this.el.addEventListener('click', e => this.onClick(e));
     this.el.addEventListener('change', e => this.onChange(e));
     this.el.addEventListener('keydown', e => {
       e.stopPropagation();
+      const id = e.target.id;
       if (e.key === 'Escape') { e.preventDefault(); this.closeHub(); }
-      if (e.key === 'Enter' && e.target.id === 'chatInput') { e.preventDefault(); this.sendChat(); }
-      if (e.key === 'Enter' && e.target.id === 'nameInput') { e.preventDefault(); e.target.blur(); }
-      if (e.key === 'Enter' && e.target.id === 'teamName') { e.preventDefault(); this.act('teamCreate'); }
-      if (e.key === 'Enter' && e.target.id === 'chanInput') { e.preventDefault(); this.act('joinCustom'); }
+      if (e.key !== 'Enter') return;
+      if (id === 'chatInput') { e.preventDefault(); this.sendChat(); }
+      if (id === 'nameInput') { e.preventDefault(); e.target.blur(); }
+      if (id === 'teamName') { e.preventDefault(); this.act('teamCreate'); }
+      if (id === 'chanInput') { e.preventDefault(); this.act('joinCustom'); }
     });
+    setInterval(() => { if (this.open && this.room && this.room.countdown) this.render(); }, 500);
     this.render();
+  },
+
+  /* ---------- rendering helpers ---------- */
+  avatar(hero, size = 40, cls = '') { return `<canvas class="av ${cls}" data-hero="${esc(hero)}" data-kind="head" width="${size * 2}" height="${size * 2}" style="width:${size}px;height:${size}px"></canvas>`; },
+  body(hero, w, h, flip) { return `<canvas class="bodycv" data-hero="${esc(hero)}" data-kind="body" ${flip ? 'data-flip="1"' : ''} width="${w * 2}" height="${h * 2}" style="width:${w}px;height:${h}px"></canvas>`; },
+  paint() {
+    for (const cv of this.el.querySelectorAll('canvas[data-hero]')) {
+      const c = cv.getContext('2d'), w = cv.width, h = cv.height, key = cv.dataset.hero, d = SPRITE_DEFS[key];
+      c.clearRect(0, 0, w, h);
+      if (!d || !window.ATLAS || !window.ATLAS[d.a] || !SPR.img[d.a]) continue;
+      if (cv.dataset.kind === 'body') {
+        const sheet = SPR.img[key + '_d'] ? key + '_d' : d.a, fr = window.ATLAS[sheet][0];
+        drawSprite(c, sheet, 0, w / 2, h - 6, cv.dataset.flip ? -1 : 1, Math.min((h * 0.94) / fr.h, (w * 0.95) / fr.w));
+      } else {
+        c.save(); c.beginPath(); c.arc(w / 2, h / 2, w / 2, 0, TAU); c.clip();
+        const g = c.createRadialGradient(w / 2, h / 3, 2, w / 2, h / 2, w / 2); g.addColorStop(0, '#6a4420'); g.addColorStop(1, '#1a0f08');
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+        drawPortraitSpr(c, key, w / 2, h / 2 + w * 0.04, w / 2);
+        c.restore();
+      }
+    }
   },
   render() {
     if (!this.el || !this.open) return;
-    const s = this.social, me = this.me;
-    const dot = st => `<i class="dot ${st === 'offline' ? 'off' : st === 'idle' ? 'on' : 'busy'}"></i>`;
-    const heroBtns = cur => Object.keys(HERO_NAMES).map(h => `<button class="chip ${cur === h ? 'sel' : ''}" data-act="hero" data-hero="${h}">${HERO_NAMES[h]}</button>`).join('');
-    const stageOpts = sel => STAGES.map((st, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${esc(st.name)}</option>`).join('');
-    const statusTxt = { online: 'Online', connecting: 'Connecting…', offline: 'Offline — server unreachable' }[this.status];
-
-    // left column: profile, channels, friends, team
-    const friends = s.friends.map(f => `<li>${dot(f.status)}<span class="nm">${esc(f.name)}</span><small>${esc(f.status)}</small>
-      ${f.online && f.status === 'idle' ? `<button class="mini" data-act="challenge" data-id="${f.id}">Duel</button>` : ''}
-      ${s.team && s.team.owner === me.id && !s.team.members.some(m => m.id === f.id) ? `<button class="mini ghost" data-act="teamInvite" data-id="${f.id}">+Team</button>` : ''}
-      <button class="mini ghost" data-act="unfriend" data-id="${f.id}" title="Remove friend">&times;</button></li>`).join('') || '<li class="empty">No friends yet. Add players from the list.</li>';
-    const requests = s.requests.map(r => `<li><span class="nm">${esc(r.name)}</span> wants to be friends
-      <button class="mini" data-act="accept" data-id="${r.id}">Accept</button><button class="mini ghost" data-act="decline" data-id="${r.id}">No</button></li>`).join('');
-    const teamInv = s.teamInvites.map(t => `<li>Join team <b>${esc(t.name)}</b>? <button class="mini" data-act="teamAccept" data-id="${t.id}">Join</button><button class="mini ghost" data-act="teamDecline" data-id="${t.id}">No</button></li>`).join('');
-    const team = s.team ? `<div class="teamhead"><b>${esc(s.team.name)}</b><small>${s.team.members.length}/8</small></div>
-      <ul class="list">${s.team.members.map(m => `<li>${dot(m.status)}<span class="nm">${esc(m.name)}${m.id === s.team.owner ? ' ♛' : ''}</span><small>${esc(m.status)}</small></li>`).join('')}</ul>
-      <button class="mini ghost" data-act="teamLeave">Leave team</button>`
-      : `<div class="row"><input id="teamName" maxlength="24" placeholder="Team name"><button class="mini" data-act="teamCreate">Create</button></div>`;
-    const left = `
-      <section><h4>Profile</h4>
-        <div class="row"><input id="nameInput" maxlength="20" value="${esc(me.name)}" placeholder="Your name"></div>
-        <div class="chips">${heroBtns(me.hero)}</div></section>
-      <section><h4>Channels</h4>
-        <ul class="list chans">${(this.channels.length ? this.channels : [{ name: 'Global', count: 0 }]).map(ch => `<li class="${ch.name === this.channel ? 'cur' : ''}" data-act="join" data-ch="${esc(ch.name)}"># ${esc(ch.name)}<small>${ch.count}</small></li>`).join('')}</ul>
-        <div class="row"><input id="chanInput" maxlength="24" placeholder="Custom channel"><button class="mini" data-act="joinCustom">Join</button></div></section>
-      <section><h4>Friends</h4>${requests ? `<ul class="list req">${requests}</ul>` : ''}<ul class="list">${friends}</ul></section>
-      <section><h4>Team</h4>${teamInv ? `<ul class="list req">${teamInv}</ul>` : ''}${team}</section>`;
-
-    // center: room view or channel view
-    let center;
-    const r = this.room;
-    if (r) {
-      const isHost = r.host === me.id, mine = r.players.find(p => p.id === me.id) || {};
-      const slot = p => `<li class="slot ${p.side === 'A' ? 'sa' : p.side === 'B' ? 'sb' : ''}"><span class="nm">${esc(p.name)}${p.id === r.host ? ' <small>host</small>' : ''}</span>
-        <span>${HERO_NAMES[p.hero] || p.hero}</span><span class="${p.ready || p.id === r.host ? 'ok' : 'wait'}">${p.id === r.host ? 'HOST' : p.ready ? 'READY' : 'not ready'}</span></li>`;
-      const sides = r.mode === 'team'
-        ? ['A', 'B'].map(sd => `<div class="side s${sd}"><h5>${esc((r.teamNames && r.teamNames[sd]) || 'Team ' + sd)}</h5><ul class="list">${r.players.filter(p => p.side === sd).map(slot).join('') || '<li class="empty">empty</li>'}</ul>
-          ${!r.teamNames && mine.side !== sd ? `<button class="mini ghost" data-act="side" data-side="${sd}">Switch here</button>` : ''}</div>`).join('')
-        : `<ul class="list">${r.players.map(slot).join('')}</ul>`;
-      center = `<section class="room"><h3>${esc(r.name)}</h3><p class="sub">${esc(r.label)} · ${r.players.length}/${r.max} players</p>
-        <div class="row"><label>Stage</label><select id="roomStage" ${isHost ? '' : 'disabled'}>${stageOpts(r.stage)}</select></div>
-        <div class="row"><label>Fighter</label><div class="chips">${heroBtns(mine.hero)}</div></div>
-        <div class="sides ${r.mode === 'team' ? 'two' : ''}">${sides}</div>
-        <div class="actions">
-          ${isHost ? `<button class="cta" data-act="start">Start match</button>` : `<button class="cta ${mine.ready ? 'ghost' : ''}" data-act="ready">${mine.ready ? 'Not ready' : 'Ready'}</button>`}
-          <button class="cta ghost" data-act="leaveRoom">Leave room</button></div>
-        <p class="hint">Invite friends with <b>Duel</b> in your friends list, or share this room's name in chat.</p></section>`;
+    const keep = {};
+    for (const inp of this.el.querySelectorAll('input')) keep[inp.id] = inp.value;
+    const focused = document.activeElement && document.activeElement.id;
+    const statusTxt = { online: 'ONLINE', connecting: 'CONNECTING…', offline: 'OFFLINE' }[this.status];
+    const s = this.social, reqCount = s.requests.length + s.teamInvites.length;
+    const head = `<header>
+        <div class="brand"><span class="logo">MUSTAFA</span><span class="sub">ONLINE ARENA</span></div>
+        <span class="status ${this.status}"><i></i>${statusTxt}</span>
+        ${this.status === 'offline' ? '<button class="btn sm" data-act="reconnect">Retry</button>' : ''}
+        <label class="chan"># <select id="chanSelect">${(this.channels.length ? this.channels : [{ name: this.channel || 'Global', count: 0 }]).map(c => `<option value="${esc(c.name)}" ${c.name === this.channel ? 'selected' : ''}>${esc(c.name)} (${c.count})</option>`).join('')}${this.channel && !this.channels.some(c => c.name === this.channel) ? `<option selected>${esc(this.channel)}</option>` : ''}</select></label>
+        <div class="mechip">${this.avatar(this.me.hero, 34)}<input id="nameInput" maxlength="20" value="${esc(this.me.name)}" placeholder="Your name" title="Click to rename"></div>
+        <button class="x" data-act="close" aria-label="Close">&times;</button>
+      </header>
+      <nav class="tabs">
+        ${[['play', this.room ? '⚔ YOUR MATCH' : '⚔ PLAY'], ['friends', '♥ FRIENDS'], ['team', '⚑ TEAM']].map(([k, l]) => `<button class="tab ${this.tab === k ? 'sel' : ''}" data-act="tab" data-tab="${k}">${l}${k === 'friends' && reqCount ? `<b class="badge">${reqCount}</b>` : ''}</button>`).join('')}
+      </nav>`;
+    const invites = this.invites.map((iv, i) => `<div class="invite">${this.avatar('mustafa', 28)}<span><b>${esc(iv.name)}</b> ${iv.kind === 'team' ? `invites you to team <b>${esc(iv.team)}</b>` : `challenges you to <b>${esc(iv.label)}</b>!`}</span>
+      <button class="btn sm gold" data-act="inviteYes" data-i="${i}">Accept</button><button class="btn sm" data-act="inviteNo" data-i="${i}">Decline</button></div>`).join('');
+    let main = '';
+    if (this.tab === 'play') main = this.room ? this.roomView() : this.lobbyView();
+    else if (this.tab === 'friends') main = this.friendsView();
+    else main = this.teamView();
+    this.el.querySelector('.hub').innerHTML = `${head}${invites ? `<div class="invites">${invites}</div>` : ''}
+      <div class="body"><div class="main">${main}</div>${this.chatView()}</div>`;
+    for (const [id, v] of Object.entries(keep)) { const inp = document.getElementById(id); if (inp && id !== 'nameInput') inp.value = v; }
+    if (focused) { const f = document.getElementById(focused); if (f) f.focus(); }
+    const msgs = document.getElementById('msgs'); if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    this.paint();
+  },
+  heroPicker(cur) {
+    return `<div class="heroes">${Object.keys(HERO_NAMES).map(h => `<button class="hero ${cur === h ? 'sel' : ''}" data-act="hero" data-hero="${h}">
+      ${this.body(h, 92, 120)}<b>${HERO_NAMES[h]}</b><small>${HERO_ROLE[h]}</small></button>`).join('')}</div>`;
+  },
+  lobbyView() {
+    const waiting = mode => this.rooms.filter(r => r.quick && r.mode === mode && r.status === 'open').reduce((n, r) => n + r.count, 0);
+    const quick = Object.entries(MODE_INFO).map(([k, v], i) => `<button class="quick q-${k}" data-act="quick" data-mode="${k}" style="background-image:linear-gradient(180deg,rgba(10,5,4,.15),rgba(10,5,4,.92)),url(${stageImg([0, 4, 3][i])})">
+        <span class="qicon">${v.icon}</span><span class="qt">${v.title.toUpperCase()}</span><span class="qs">${v.sub}</span>
+        <span class="qw">${waiting(k) ? `● ${waiting(k)} waiting` : 'Find a match'}</span></button>`).join('');
+    const live = this.rooms.map(r => {
+      const sides = r.mode === 'team' ? ['A', 'B'] : null;
+      const faces = sides
+        ? sides.map(sd => `<div class="faces s${sd}">${r.players.filter(p => p.side === sd).map(p => this.avatar(p.hero, 30)).join('') || '<i class="emptyface">?</i>'}</div>`).join('<span class="vs">VS</span>')
+        : r.players.map(p => this.avatar(p.hero, 30)).join('<span class="vs">VS</span>') + (r.count < r.max ? `${r.count ? '<span class="vs">VS</span>' : ''}<i class="emptyface">?</i>` : '');
+      const playing = r.status === 'playing', full = r.count >= r.max;
+      return `<div class="card match ${playing ? 'live' : ''}" style="background-image:linear-gradient(180deg,rgba(8,4,4,.25) 0%,rgba(8,4,4,.95) 78%),url(${stageImg(r.stage)})">
+        <div class="mtop"><span class="mode m-${r.mode}">${MODE_INFO[r.mode].short}</span><span class="st ${playing ? 'fight' : 'open'}">${playing ? '● FIGHTING' : `OPEN ${r.count}/${r.max}`}</span></div>
+        <div class="mname">${esc(r.name)}</div><div class="mstage">${esc((STAGES[r.stage] || {}).name || '')}</div>
+        <div class="mfaces">${faces}</div>
+        <div class="mnames">${r.players.map(p => esc(p.name)).join(' · ')}</div>
+        ${playing ? '<button class="btn wide" disabled>In progress</button>' : full ? '<button class="btn wide" disabled>Full</button>' : `<button class="btn gold wide" data-act="joinRoom" data-id="${r.id}">JOIN FIGHT</button>`}
+      </div>`;
+    }).join('');
+    const others = this.players.filter(p => p.id !== this.me.id);
+    const friends = new Set(this.social.friends.map(f => f.id));
+    const online = others.map(p => `<div class="pchip">${this.avatar(p.hero, 38)}<div class="pinfo"><b>${esc(p.name)}</b><small><i class="dot ${p.status === 'idle' ? 'on' : 'busy'}"></i>${p.status === 'idle' ? 'Ready to fight' : esc(p.status)}${p.team ? ' · ' + esc(p.team) : ''}</small></div>
+        ${p.status === 'idle' ? `<button class="btn sm gold" data-act="challenge" data-id="${p.id}">⚔ Duel</button>` : ''}
+        ${friends.has(p.id) ? '<span class="tagf">♥</span>' : `<button class="btn sm" data-act="friend" data-id="${p.id}" title="Add friend">+♥</button>`}</div>`).join('');
+    const create = this.creating ? `<div class="create">
+        <div class="row">${Object.entries(MODE_INFO).map(([k, v]) => `<button class="chip ${this.newMode === k ? 'sel' : ''}" data-act="newMode" data-mode="${k}">${v.icon} ${v.title}</button>`).join('')}</div>
+        <div class="stages">${STAGES.map((st, i) => `<button class="stage ${this.newStage === i ? 'sel' : ''}" data-act="newStage" data-i="${i}" style="background-image:url(${stageImg(i)})"><span>${esc(st.name)}</span></button>`).join('')}</div>
+        <div class="row"><button class="btn gold" data-act="createRoom">Create match</button><button class="btn" data-act="toggleCreate">Cancel</button></div></div>` : '';
+    return `<section><h3>CHOOSE YOUR FIGHTER</h3>${this.heroPicker(this.me.hero)}</section>
+      <section><h3>PLAY NOW</h3><div class="quicks">${quick}</div></section>
+      <section><div class="sechead"><h3>LIVE FIGHTS <small>#${esc(this.channel || '')}</small></h3><button class="btn sm" data-act="toggleCreate">${this.creating ? 'Close' : '+ Create custom match'}</button></div>
+        ${create}<div class="matches">${live || '<div class="empty big">No fights yet — hit <b>Quick Duel</b> to start one and others will join you.</div>'}</div></section>
+      <section><h3>ONLINE NOW <small>${others.length} player${others.length === 1 ? '' : 's'}</small></h3><div class="pchips">${online || '<div class="empty">You are the only one here. Share the game link with friends!</div>'}</div></section>`;
+  },
+  roomView() {
+    const r = this.room, me = this.me, isHost = r.host === me.id, mine = r.players.find(p => p.id === me.id) || {};
+    const card = (p, flip) => p ? `<div class="fcard ${p.side === 'A' ? 'sa' : p.side === 'B' ? 'sb' : ''} ${p.id === me.id ? 'mine' : ''}">
+        ${this.body(p.hero, 150, 190, flip)}<b>${esc(p.name)}${p.id === me.id ? ' (you)' : ''}</b><small>${HERO_NAMES[p.hero] || ''}</small>
+        <span class="rd ${p.ready || r.quick || p.id === r.host ? 'ok' : ''}">${p.id === r.host ? 'HOST' : (p.ready || r.quick) ? '✓ READY' : 'not ready'}</span></div>`
+      : `<div class="fcard empty"><div class="spin"></div><b>Waiting…</b><small>for a challenger</small></div>`;
+    let arena;
+    if (r.mode === 'team') {
+      arena = ['A', 'B'].map(sd => {
+        const list = r.players.filter(p => p.side === sd);
+        return `<div class="side s${sd}"><h4>${esc((r.teamNames && r.teamNames[sd]) || (sd === 'A' ? 'RED TEAM' : 'BLUE TEAM'))}</h4><div class="fcards">${list.map(p => card(p, sd === 'B')).join('') || card(null)}</div>
+          ${!r.teamNames && mine.side !== sd && !r.quick ? `<button class="btn sm" data-act="side" data-side="${sd}">Switch to this side</button>` : ''}</div>`;
+      }).join('<div class="bigvs">VS</div>');
     } else {
-      const others = this.players.filter(p => p.id !== me.id);
-      const fr = new Set(s.friends.map(f => f.id));
-      const myTeam = s.team;
-      const plist = others.map(p => `<li>${dot(p.status)}<span class="nm">${esc(p.name)}</span><small>${HERO_NAMES[p.hero] || ''}${p.team ? ' · ' + esc(p.team) : ''}</small>
-        ${p.status === 'idle' ? `<button class="mini" data-act="challenge" data-id="${p.id}">Duel</button>` : `<small class="busy">${esc(p.status)}</small>`}
-        ${fr.has(p.id) ? '' : `<button class="mini ghost" data-act="friend" data-id="${p.id}">+Friend</button>`}
-        ${myTeam && myTeam.owner === me.id && !p.team ? `<button class="mini ghost" data-act="teamInvite" data-id="${p.id}">+Team</button>` : ''}
-        ${myTeam && p.team && p.team !== myTeam.name ? `<button class="mini ghost" data-act="teamChallenge" data-team="${esc(p.team)}">Team war</button>` : ''}</li>`).join('')
-        || '<li class="empty">Nobody else here yet. Share the game link with friends!</li>';
-      const rlist = this.rooms.map(rm => `<li><span class="nm">${esc(rm.name)}</span><small>${esc(rm.label)} · ${rm.count}/${rm.max} · ${rm.status === 'playing' ? 'in match' : 'open'}</small>
-        ${rm.status === 'open' && rm.count < rm.max ? `<button class="mini" data-act="joinRoom" data-id="${rm.id}">Join</button>` : ''}</li>`).join('') || '<li class="empty">No rooms yet. Create one!</li>';
-      center = `<section><h4>Players in #${esc(this.channel || '')}</h4><ul class="list players">${plist}</ul></section>
-        <section><h4>Rooms</h4><ul class="list">${rlist}</ul>
-          <div class="create"><select id="newMode">${Object.entries(MODE_INFO).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-          <select id="newStage">${stageOpts(0)}</select>
-          <button class="cta" data-act="createRoom">Create room</button></div></section>`;
+      const slots = []; for (let i = 0; i < r.max; i++) slots.push(r.players[i] || null);
+      arena = slots.map((p, i) => card(p, i % 2 === 1)).join('<div class="bigvs">VS</div>');
     }
-
-    // right: chat
+    const cd = r.countdown ? Math.ceil(r.countdown / 1000) : 0;
+    const status = cd ? `<div class="countdown">FIGHT STARTS IN <b>${cd}</b></div>` : r.quick ? `<div class="countdown wait">Looking for opponents… the fight starts automatically</div>` : '';
+    return `<div class="banner" style="background-image:linear-gradient(90deg,rgba(8,4,4,.92),rgba(8,4,4,.35)),url(${stageImg(r.stage)})">
+        <span class="mode m-${r.mode}">${MODE_INFO[r.mode].short}</span><h2>${esc(r.name)}</h2><p>${esc((STAGES[r.stage] || {}).name || '')} · ${r.players.length}/${r.max} fighters</p>${status}</div>
+      <div class="vsarea ${r.mode === 'team' ? 'team' : ''}">${arena}</div>
+      <section><h3>YOUR FIGHTER</h3>${this.heroPicker(mine.hero)}</section>
+      ${isHost && !r.quick ? `<section><h3>STAGE</h3><div class="stages">${STAGES.map((st, i) => `<button class="stage ${r.stage === i ? 'sel' : ''}" data-act="roomStage" data-i="${i}" style="background-image:url(${stageImg(i)})"><span>${esc(st.name)}</span></button>`).join('')}</div></section>` : ''}
+      <div class="actions">
+        ${r.quick ? '' : isHost ? `<button class="btn gold big" data-act="start">⚔ START FIGHT</button>` : `<button class="btn ${mine.ready ? '' : 'gold'} big" data-act="ready">${mine.ready ? 'Cancel ready' : '✓ I\'M READY'}</button>`}
+        <button class="btn big" data-act="leaveRoom">Leave</button></div>`;
+  },
+  friendsView() {
+    const s = this.social;
+    const reqs = s.requests.map(r => `<div class="pchip">${this.avatar('mustafa', 38)}<div class="pinfo"><b>${esc(r.name)}</b><small>wants to be your friend</small></div>
+      <button class="btn sm gold" data-act="accept" data-id="${r.id}">Accept</button><button class="btn sm" data-act="decline" data-id="${r.id}">Decline</button></div>`).join('');
+    const list = s.friends.map(f => `<div class="pchip">${this.avatar('mustafa', 38)}<div class="pinfo"><b>${esc(f.name)}</b><small><i class="dot ${f.status === 'offline' ? 'off' : f.status === 'idle' ? 'on' : 'busy'}"></i>${esc(f.status)}</small></div>
+      ${f.online && f.status === 'idle' ? `<button class="btn sm gold" data-act="challenge" data-id="${f.id}">⚔ Duel</button>` : ''}
+      ${s.team && s.team.owner === this.me.id && !s.team.members.some(m => m.id === f.id) ? `<button class="btn sm" data-act="teamInvite" data-id="${f.id}">+ Team</button>` : ''}
+      <button class="btn sm" data-act="unfriend" data-id="${f.id}" title="Remove friend">&times;</button></div>`).join('');
+    return `${reqs ? `<section><h3>FRIEND REQUESTS</h3><div class="pchips">${reqs}</div></section>` : ''}
+      <section><h3>YOUR FRIENDS <small>${s.friends.length}</small></h3><div class="pchips">${list || '<div class="empty big">No friends yet. Add players from <b>Online now</b> on the Play tab with the +♥ button.</div>'}</div></section>`;
+  },
+  teamView() {
+    const s = this.social, t = s.team;
+    const inv = s.teamInvites.map(x => `<div class="pchip"><div class="pinfo"><b>Team ${esc(x.name)}</b><small>invited you to join</small></div>
+      <button class="btn sm gold" data-act="teamAccept" data-id="${x.id}">Join</button><button class="btn sm" data-act="teamDecline" data-id="${x.id}">No</button></div>`).join('');
+    if (!t) return `${inv ? `<section><h3>TEAM INVITES</h3><div class="pchips">${inv}</div></section>` : ''}
+      <section class="teamnew"><h3>CREATE A TEAM</h3><p>Form a team with your friends (up to 8) and challenge other teams to a team battle.</p>
+        <div class="row"><input id="teamName" maxlength="24" placeholder="Team name, e.g. Dhaka Tigers"><button class="btn gold" data-act="teamCreate">Create team</button></div></section>`;
+    const rivals = [...new Set(this.players.filter(p => p.team && p.team !== t.name).map(p => p.team))];
+    const friendsOut = s.friends.filter(f => !t.members.some(m => m.id === f.id));
+    return `${inv ? `<section><h3>TEAM INVITES</h3><div class="pchips">${inv}</div></section>` : ''}
+      <section><div class="teamcard"><span class="crest">⚑</span><div><h2>${esc(t.name)}</h2><small>${t.members.length}/8 members · captain ${esc((t.members.find(m => m.id === t.owner) || {}).name || '')}</small></div>
+        <button class="btn sm" data-act="teamLeave">Leave team</button></div>
+        <div class="pchips">${t.members.map(m => `<div class="pchip">${this.avatar('mustafa', 38)}<div class="pinfo"><b>${esc(m.name)}${m.id === t.owner ? ' ♛' : ''}</b><small><i class="dot ${m.status === 'offline' ? 'off' : m.status === 'idle' ? 'on' : 'busy'}"></i>${esc(m.status)}</small></div></div>`).join('')}</div></section>
+      <section><h3>CHALLENGE A TEAM</h3><div class="pchips">${rivals.map(name => `<div class="pchip"><span class="crest sm">⚑</span><div class="pinfo"><b>${esc(name)}</b><small>online in #${esc(this.channel || '')}</small></div>
+        <button class="btn sm gold" data-act="teamChallenge" data-team="${esc(name)}">⚔ Team battle</button></div>`).join('') || '<div class="empty">No other teams online in this channel right now.</div>'}</div></section>
+      ${t.owner === this.me.id ? `<section><h3>INVITE FRIENDS</h3><div class="pchips">${friendsOut.map(f => `<div class="pchip">${this.avatar('mustafa', 38)}<div class="pinfo"><b>${esc(f.name)}</b><small>${esc(f.status)}</small></div><button class="btn sm gold" data-act="teamInvite" data-id="${f.id}">Invite</button></div>`).join('') || '<div class="empty">Add friends first, then invite them here.</div>'}</div></section>` : ''}`;
+  },
+  chatView() {
+    const r = this.room, s = this.social;
     const scopes = ['channel', ...(r ? ['room'] : []), ...(s.team ? ['team'] : [])];
     if (!scopes.includes(this.chatScope)) this.chatScope = 'channel';
-    const chat = this.chat.filter(c => c.scope === this.chatScope).slice(-60)
-      .map(c => `<div class="msg"><b class="${c.from === me.id ? 'me' : ''}">${esc(c.name)}</b> ${esc(c.text)}</div>`).join('') || '<div class="empty">Say hello!</div>';
-    const right = `<section class="chat"><div class="tabs">${scopes.map(sc => `<button class="tab ${sc === this.chatScope ? 'sel' : ''}" data-act="scope" data-scope="${sc}">${sc === 'channel' ? '#' + esc(this.channel || '') : sc}</button>`).join('')}</div>
-      <div class="msgs" id="msgs">${chat}</div><div class="row"><input id="chatInput" maxlength="200" placeholder="Message…"><button class="mini" data-act="chat">Send</button></div></section>`;
-
-    const invites = this.invites.map((iv, i) => `<div class="invite"><b>${esc(iv.name)}</b> ${iv.kind === 'team' ? `invites you to team <b>${esc(iv.team)}</b>` : `challenges you: <b>${esc(iv.label)}</b>`}
-      <button class="mini" data-act="inviteYes" data-i="${i}">Accept</button><button class="mini ghost" data-act="inviteNo" data-i="${i}">Decline</button></div>`).join('');
-
-    const keepChat = document.getElementById('chatInput'), draft = keepChat ? keepChat.value : '', focused = document.activeElement && document.activeElement.id;
-    this.el.querySelector('.hub').innerHTML = `
-      <header><h2>ONLINE ARENA</h2><span class="status ${this.status}">${statusTxt}</span>${this.status === 'offline' ? '<button class="mini" data-act="reconnect">Retry</button>' : ''}<button class="close" data-act="close" aria-label="Close">&times;</button></header>
-      ${invites ? `<div class="invites">${invites}</div>` : ''}
-      <div class="cols"><div class="col left">${left}</div><div class="col mid">${center}</div><div class="col right">${right}</div></div>`;
-    const ci = document.getElementById('chatInput'); if (ci) { ci.value = draft; if (focused === 'chatInput') ci.focus(); }
-    const msgs = document.getElementById('msgs'); if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    const msgs = this.chat.filter(c => c.scope === this.chatScope).slice(-60)
+      .map(c => `<div class="msg"><b class="${c.from === this.me.id ? 'me' : ''}">${esc(c.name)}</b> ${esc(c.text)}</div>`).join('') || '<div class="empty">Say hello to everyone!</div>';
+    return `<aside class="chat"><div class="ctabs">${scopes.map(sc => `<button class="ctab ${sc === this.chatScope ? 'sel' : ''}" data-act="scope" data-scope="${sc}">${sc === 'channel' ? '#' + esc(this.channel || 'chat') : sc === 'room' ? 'Match' : 'Team'}</button>`).join('')}</div>
+      <div class="msgs" id="msgs">${msgs}</div><div class="row"><input id="chatInput" maxlength="200" placeholder="Type a message…"><button class="btn sm gold" data-act="chat">Send</button></div></aside>`;
   },
   sendChat() {
     const i = document.getElementById('chatInput'); if (!i || !i.value.trim()) return;
     this.send({ t: 'chat', text: i.value, scope: this.chatScope }); i.value = '';
   },
   onChange(e) {
-    if (e.target.id === 'nameInput') { const name = e.target.value.trim(); if (name) { this.send({ t: 'profile', name }); this.saveIdent({ name }); } }
-    if (e.target.id === 'roomStage') this.send({ t: 'roomUpdate', stage: +e.target.value });
+    if (e.target.id === 'nameInput') { const name = e.target.value.trim(); if (name) { this.me.name = name; this.send({ t: 'profile', name }); this.saveIdent({ name }); } }
+    if (e.target.id === 'chanSelect') this.send({ t: 'join', channel: e.target.value });
   },
   onClick(e) {
     if (e.target === this.el) return this.closeHub();
-    const b = e.target.closest('[data-act]'); if (!b) return;
+    const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
     this.act(b.dataset.act, b.dataset);
   },
   act(a, d = {}) {
@@ -198,10 +297,16 @@ const Net = {
     switch (a) {
       case 'close': this.closeHub(); break;
       case 'reconnect': this.retry = 0; this.connect(); break;
+      case 'tab': this.tab = d.tab; this.render(); break;
       case 'hero': this.me.hero = d.hero; this.saveIdent({ hero: d.hero }); G.selIdx = Math.max(0, HEROES.findIndex(h => h.id === d.hero));
         this.send({ t: 'profile', hero: d.hero }); if (this.room) this.send({ t: 'roomUpdate', hero: d.hero }); this.render(); break;
-      case 'join': this.send({ t: 'join', channel: d.ch }); break;
       case 'joinCustom': { const ch = (val('chanInput') || '').trim(); if (ch) this.send({ t: 'join', channel: ch }); break; }
+      case 'quick': this.send({ t: 'quick', mode: d.mode }); break;
+      case 'toggleCreate': this.creating = !this.creating; this.render(); break;
+      case 'newMode': this.newMode = d.mode; this.render(); break;
+      case 'newStage': this.newStage = +d.i; this.render(); break;
+      case 'createRoom': this.creating = false; this.send({ t: 'roomCreate', mode: this.newMode, stage: this.newStage }); break;
+      case 'roomStage': this.send({ t: 'roomUpdate', stage: +d.i }); break;
       case 'challenge': this.send({ t: 'challenge', to: d.id, mode: 'duel', stage: Math.floor(Math.random() * STAGES.length) }); break;
       case 'friend': this.send({ t: 'friendRequest', to: d.id }); break;
       case 'unfriend': this.send({ t: 'friendRemove', id: d.id }); break;
@@ -212,13 +317,7 @@ const Net = {
       case 'teamAccept': this.send({ t: 'teamAccept', teamId: d.id }); break;
       case 'teamDecline': this.send({ t: 'teamDecline', teamId: d.id }); break;
       case 'teamLeave': this.send({ t: 'teamLeave' }); break;
-      case 'teamChallenge': {
-        const p = this.players.find(x => x.team === d.team);
-        // the server resolves the team id from any member; ask via a member's id
-        if (p) this.send({ t: 'teamChallengeByMember', member: p.id });
-        break;
-      }
-      case 'createRoom': this.send({ t: 'roomCreate', mode: val('newMode'), stage: +val('newStage') }); break;
+      case 'teamChallenge': { const p = this.players.find(x => x.team === d.team); if (p) this.send({ t: 'teamChallengeByMember', member: p.id }); this.tab = 'play'; break; }
       case 'joinRoom': this.send({ t: 'roomJoin', roomId: d.id }); break;
       case 'leaveRoom': this.send({ t: 'roomLeave' }); break;
       case 'ready': { const mine = this.room.players.find(p => p.id === this.me.id); this.send({ t: 'roomUpdate', ready: !(mine && mine.ready) }); break; }
@@ -228,10 +327,8 @@ const Net = {
       case 'chat': this.sendChat(); break;
       case 'inviteYes': case 'inviteNo': {
         const iv = this.invites.splice(+d.i, 1)[0];
-        if (iv && a === 'inviteYes') {
-          if (iv.kind === 'team') this.send({ t: 'teamAccept', teamId: iv.teamId });
-          else this.send({ t: 'roomJoin', roomId: iv.roomId });
-        } else if (iv && iv.kind === 'team') this.send({ t: 'teamDecline', teamId: iv.teamId });
+        if (iv && a === 'inviteYes') { if (iv.kind === 'team') this.send({ t: 'teamAccept', teamId: iv.teamId }); else this.send({ t: 'roomJoin', roomId: iv.roomId }); }
+        else if (iv && iv.kind === 'team') this.send({ t: 'teamDecline', teamId: iv.teamId });
         this.render(); break;
       }
     }
