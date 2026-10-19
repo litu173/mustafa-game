@@ -45,12 +45,21 @@ function makePlayer() {
   p.ctl = Input;   // who steers this fighter: the keyboard, or a RemoteCtl in online matches
   return p;
 }
+/* ---------- Difficulty (story mode only; online fights are player vs player) ---------- */
+const DIFFS = [
+  { name: 'NORMAL', aggro: 1, cool: 0.8,  spd: 1.05, dmg: 1.15, hp: 1,    poise: 6, dodge: 0.15, punish: 0.35 },
+  { name: 'HARD',   aggro: 2, cool: 0.5,  spd: 1.18, dmg: 1.5,  hp: 1.2,  poise: 4, dodge: 0.35, punish: 0.7 },
+  { name: 'LEGEND', aggro: 4, cool: 0.38, spd: 1.3,  dmg: 1.85, hp: 1.35, poise: 3, dodge: 0.5,  punish: 1 },
+];
+const DIF = () => DIFFS[Save.d.diff ?? 1] || DIFFS[1];
 function makeEnemy(type, x, y) {
   const d = ENEMY_DEFS[type];
   const look = d.look ? { ...d.look } : null;
   if (type === 'razor') { look.bandana = pick(BANDANA); look.pants = pick(JEANS); }
   const e = new Fighter(d, 'enemy', x, y, look);
   e.type = type;
+  const D = DIF();
+  e.hp = e.maxHp = e.lagHp = Math.round(d.hp * D.hp); e.cool *= D.cool;
   if (d.flyer) e.z = 230;
   return e;
 }
@@ -165,7 +174,7 @@ function damage(t, a, dmg, m = {}) {
     G.banner = { title: 'MUTATION!', sub: 'Dr. Kaiser injects the serum', t: 0, dur: 150, warn: true };
     return true;
   }
-  const armor = boss && !m.down && t.hp > 0 && (t.state === 'attack' || t.state === 'charge' || t.state === 'enter' || t.armorT > 0);
+  const armor = t.team === 'enemy' && !m.down && t.hp > 0 && (t.armorT > 0 || boss && (t.state === 'attack' || t.state === 'charge' || t.state === 'enter'));
   if (t.state === 'grabbed' && a === t.grabber && t.hp > 0) {
     // stays held
   } else if (t.hp <= 0 || m.down || (t.z > 0 && !boss)) {
@@ -179,6 +188,14 @@ function damage(t, a, dmg, m = {}) {
     t.move = null; t.setState('hurt');
     t.hurtDur = m.stun || (boss ? 10 : 17); t.vx = dir * (m.kb || 2) * KB; t.facing = -dir;
     if (boss && ++t.poise >= 4) { t.poise = 0; t.armorT = 100; }
+    else if (t.team === 'enemy' && !boss && !t.def.flyer && !G.arena) {
+      if (G.t - (t.lastHurt ?? -999) > 100) t.poise = 0;
+      t.lastHurt = G.t;
+      if (++t.poise >= DIF().poise) {   // shrugs off the combo and hits back
+        t.poise = 0; t.armorT = 45; t.cool = 0; t.setState('idle'); t.vx = 0; t.facing = dir > 0 ? -1 : 1;
+        popText(t.x, t.y, hz + 60, 'COUNTER!', '#ff7a5a', 30); Sound.play('roar');
+      }
+    }
   }
   if (t.hp <= 0 && !t.koed) { t.koed = true; onKO(t); }
   return true;
@@ -239,7 +256,7 @@ function tickAttack(f) {
   }
   if (m.dmg && f.t >= m.a0 && f.t <= m.a1) {
     if (m.tick && (f.t - m.a0) % m.tick === 0) f.hitSet.clear();
-    let dmg = m.dmg * (f.team === 'hero' ? f.def.power : 1) * (f.enraged ? 1.25 : 1);
+    let dmg = m.dmg * (f.team === 'hero' ? f.def.power : DIF().dmg) * (f.enraged ? 1.25 : 1);
     if (f.moveName === 'wswing' && MELEE_W[f.weapon]) dmg = MELEE_W[f.weapon].dmg * f.def.power;
     const hit = m.radius ? hitArea(f, m.radius, m.depth, dmg, m) : hitBox(f, m.range, m.depth, dmg, m);
     if (hit && MELEE_W[f.weapon] && f.team === 'hero' && !f.wHit) {
@@ -252,7 +269,7 @@ function tickAttack(f) {
     if (f.team === 'hero' && f.buffer && m.next) { startMove(f, m.next === 'fin' ? f.def.finisher : m.next); return; }
     if (f.team === 'hero' && m.auto && f.weapon === 'uzi' && f.ctl && f.ctl.held('atk')) { startMove(f, 'uzi'); return; }
     f.move = null; f.setState('idle');
-    if (f.team === 'enemy') f.cool = rand(f.def.cool[0], f.def.cool[1]) * (f.enraged ? 0.6 : 1);
+    if (f.team === 'enemy') f.cool = rand(f.def.cool[0], f.def.cool[1]) * (f.enraged ? 0.6 : 1) * DIF().cool;
   }
 }
 
@@ -262,6 +279,7 @@ function fire(f, kind) {
   const pw = hero ? f.def.power * (f.def.gunBonus || 1) : 1;
   const P = o => {
     const b = Object.assign({ x, y: f.y, z, team: f.team, owner: f, life: 90 }, o);
+    if (!hero && b.dmg) b.dmg *= DIF().dmg;
     G.projs.push(b);
     if (G.arena && f.mine) { b.id = 'p' + (++G.arena.projSeq); arenaSend({ k: 'pj', p: { id: b.id, kind: b.kind, x: Math.round(b.x), y: Math.round(b.y), z: Math.round(b.z), vx: b.vx, vy: b.vy || 0, vz: b.vz || 0, g: b.g || 0, life: b.life } }); }
   };
@@ -323,7 +341,7 @@ function updateCommon(f) {
       return true;
     case 'getup':
       f.t++;
-      if (f.t >= 18) { f.setState('idle'); f.inv = f.team === 'hero' ? 50 : 16; }
+      if (f.t >= 18) { f.setState('idle'); f.inv = f.team === 'hero' ? 50 : 16; if (f.team === 'enemy') f.cool = Math.min(f.cool, 30 * DIF().cool); }
       return true;
     case 'dead':
       f.t++;
@@ -571,28 +589,43 @@ function dinoWander(e) {
 }
 function enemyThink(e, p) {
   const d = e.def;
+  const D = DIF();
   if (e.cool > 0) e.cool--;
   if (!p) { e.state = 'idle'; return; }
   const dx = p.x - e.x, dy = p.y - e.y, adx = Math.abs(dx), ady = Math.abs(dy);
   e.facing = dx >= 0 ? 1 : -1;
-  if ((G.t + e.id * 7) % 90 === 0) e.side = e.x < p.x ? -1 : 1;
+  if (e.dodgeT > 0) {   // hop back out of a punch, then come straight back in
+    e.dodgeT--; e.x += e.dodgeDir * d.speed * 2.6; e.state = 'walk'; e.walkPh += 0.3;
+    if (e.dodgeT % 4 === 0) dust(e.x, e.y, 1);
+    if (e.dodgeT === 0) e.cool = Math.min(e.cool, 6);
+    return;
+  }
+  if (!e.aggro && (G.t + e.id * 7) % 90 === 0) e.side = e.x < p.x ? -1 : 1;
   if (e.meleeReach === undefined) e.meleeReach = Math.min(...d.melee.map(n => MOVES[n].range || MOVES[n].radius || 80));
   const reach = e.meleeReach * e.scale * 0.9 + (p.def.radius || 0);
   const pDown = ['down', 'getup', 'fall', 'dead'].includes(p.state);
+  const pm = p.state === 'attack' ? p.move : null;
+  // read the player: sidestep the start of a punch...
+  if (pm && p.t === 2 && !d.dino && e.state !== 'attack' && adx < reach + 70 && ady < 34 && Math.sign(p.facing) === -Math.sign(dx || 1) && Math.random() < D.dodge * (d.boss ? 0.5 : 1)) {
+    e.dodgeT = 12; e.dodgeDir = dx > 0 ? -1 : 1; Sound.play('whoosh'); return;
+  }
+  // ...and punish the recovery after a whiffed or finished combo
+  const pOpen = pm && p.t > (pm.a1 || 0) && !p.buffer;
+  if (!pDown && pOpen && adx < reach + 24 && ady < 24 && e.cool < 50 && (e.aggro || d.boss) && Math.random() < D.punish * 0.25) { startMove(e, pick(d.melee)); return; }
   if (d.ranged && e.cool <= 0 && ady < 18 && adx > 220 && adx < 900 && onScreen(e) && !pDown) { startMove(e, d.ranged); return; }
   if (d.charge && e.cool <= 0 && ady < 28 && adx > 300 && adx < 900 && onScreen(e) && Math.random() < 0.04) {
     e.setState('charge'); e.chargeDir = Math.sign(dx) || 1; return;
   }
-  if (!pDown && adx < reach && ady < 18 && e.cool <= 0 && (e.aggro || d.boss)) { startMove(e, pick(d.melee)); return; }
+  if (!pDown && adx < reach && ady < 22 && e.cool <= 0 && (e.aggro || d.boss)) { startMove(e, pick(d.melee)); return; }
   let tx, ty;
   if (d.keepAway) {
     tx = p.x + e.side * 460; ty = e.cool < 30 ? p.y : p.y + e.slotY;
     if (adx < 150 && ady < 16 && e.cool <= 0) { startMove(e, pick(d.melee)); return; }
-  } else if (!e.aggro) { tx = p.x + e.side * 360; ty = p.y + e.slotY * 2; }
+  } else if (!e.aggro) { tx = p.x + e.side * 290; ty = p.y + e.slotY * 2; }
   else { tx = p.x + e.side * reach * 0.8; ty = p.y; }
-  if (pDown && !d.boss) tx = p.x + e.side * 240;
+  if (pDown && !d.boss) tx = p.x + e.side * (D.aggro >= 2 ? reach + 50 : 240);   // hard: crowd the player while they get up
   tx = clamp(tx, G.camX + 60, G.camX + W - 60); ty = clamp(ty, BELT_TOP, BELT_BOT);
-  const mx = tx - e.x, my = ty - e.y, sp = d.speed * (e.enraged ? 1.3 : 1) * (e.aggro ? 1 : 0.7);
+  const mx = tx - e.x, my = ty - e.y, sp = d.speed * D.spd * (e.enraged ? 1.3 : 1) * (e.aggro ? 1 : 0.8);
   if (Math.abs(mx) > 6 || Math.abs(my) > 4) {
     e.x += clamp(mx, -sp, sp); e.y += clamp(my, -sp * 0.6, sp * 0.6); e.state = 'walk'; e.walkPh += 0.05 * sp + 0.06;
   } else e.state = 'idle';
@@ -608,7 +641,7 @@ function enemyCharge(e) {
   if (e.t === 26) e.hitSet.clear();
   e.x += e.chargeDir * 14; e.walkPh += 0.5;
   if (e.t % 3 === 0) dust(e.x - e.facing * 40, e.y, 1);
-  hitBox(e, 70, 30, 15 * (e.enraged ? 1.25 : 1), { down: true, kbx: 8, kbz: 8 });
+  hitBox(e, 70, 30, 15 * DIF().dmg * (e.enraged ? 1.25 : 1), { down: true, kbx: 8, kbz: 8 });
   if (e.t > 80 || (e.chargeDir > 0 && e.x > G.camX + W - 90) || (e.chargeDir < 0 && e.x < G.camX + 90)) { e.setState('idle'); e.cool = rand(50, 90); }
 }
 function updateFlyer(e, p) {
@@ -635,9 +668,13 @@ function updateFlyer(e, p) {
 function assignAggro() {
   const p = G.players[0];
   if (!p) return;
-  const allow = 2 + Math.floor(G.stageIdx / 2);
+  const allow = 2 + Math.floor(G.stageIdx / 2) + DIF().aggro;
   const list = G.enemies.filter(e => e.hp > 0 && !e.def.dino).sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x));
-  list.forEach((e, i) => { e.aggro = i < allow || !!e.def.boss; });
+  list.forEach((e, i) => {
+    e.aggro = i < allow || !!e.def.boss;
+    // attackers take turns on each side so the player gets surrounded
+    if (e.aggro && G.t % 120 === 0) { const nat = Math.sign(e.x - p.x) || 1; e.side = i % 2 ? -nat : nat; }
+  });
 }
 
 /* ---------- Hell Road: the car stage ---------- */
@@ -934,6 +971,7 @@ function menuInput(n, key, horizontal) {
 function titleItems() {
   return [
     { id: 'start', label: 'START GAME' },
+    { id: 'diff', label: 'LEVEL: ' + DIF().name },
     { id: 'online', label: 'ONLINE \u2694' },
     { id: 'stages', label: 'STAGE SELECT', lock: !Save.d.premium },
     { id: 'royal', label: Save.d.premium ? 'ROYAL PASS  ✓' : 'ROYAL PASS  ♛' },
@@ -964,6 +1002,7 @@ function updTitle() {
   if (ch < 0) return;
   switch (items[ch].id) {
     case 'start': G.startStage = 0; goSelect(); break;
+    case 'diff': Save.d.diff = ((Save.d.diff ?? 1) + 1) % DIFFS.length; Save.write(); break;
     case 'online': Net.openHub(); break;
     case 'stages': if (Save.d.premium) { G.overlay = 'stages'; G.stageSel = 0; } else openRoyal(); break;
     case 'royal': openRoyal(); break;
@@ -986,7 +1025,7 @@ function updSelect() {
 }
 function updIntro() {
   updateParticles();
-  if (G.sceneT > 160 || (G.sceneT > 30 && Input.confirm())) { G.scene = 'play'; G.sceneT = 0; G.goT = 160; }
+  if (G.sceneT > 160 || (G.sceneT > 30 && (Input.confirm() || Input.mouse.click))) { G.scene = 'play'; G.sceneT = 0; G.goT = 160; }
 }
 function updPlay() {
   if (G.arena) { arenaUpdate(); return false; }
@@ -1036,7 +1075,7 @@ function updClear() {
     b.shown += add; G.score += add;
     if (G.sceneT % 3 === 0) Sound.play('tick');
   }
-  if (G.sceneT > 280 || (G.sceneT > 60 && Input.confirm())) {
+  if (G.sceneT > 280 || (G.sceneT > 60 && (Input.confirm() || Input.mouse.click))) {
     if (b.shown < b.total) { G.score += b.total - b.shown; b.shown = b.total; }
     if (G.stageIdx >= STAGES.length - 1) { G.scene = 'ending'; G.sceneT = 0; Music.play('victory'); saveBest(); }
     else loadStage(G.stageIdx + 1);
@@ -1144,7 +1183,7 @@ function drawFighter(f) {
     if (m && m.pose === 'whip' && f.t >= m.a0 && f.t <= m.a1 + 4) ext = m.range * 0.85;
     drawFigure(ctx, flash ? whiteLook(f.look) : f.look, getPose(f), sx, sy, face, f.scale, {
       weapon: f.weapon, weapon2: f.weapon2, t: G.t, ext, glowEyes: !!f.phase2,
-      aura: f.royal ? '#d4af37' : f.phase2 ? '#b04cff' : (d.boss && f.armorT > 0 ? '#ff6a3a' : null),
+      aura: f.royal ? '#d4af37' : f.phase2 ? '#b04cff' : (f.team === 'enemy' && f.armorT > 0 ? '#ff6a3a' : null),
     });
   }
   if (f.state === 'charge' && f.t < 26) {
@@ -1164,7 +1203,7 @@ function drawFighterSprite(f, spr, sx, sy, flash) {
     for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(sx, sy - 150, 190 + k * 30, 50, 0, f.t * 0.5 + k * 2, f.t * 0.5 + k * 2 + 2.4); ctx.stroke(); }
     ctx.restore();
   }
-  const aura = f.royal ? '#d4af37' : f.phase2 ? '#b04cff' : (d.boss && f.armorT > 0 ? '#ff6a3a' : null);
+  const aura = f.royal ? '#d4af37' : f.phase2 ? '#b04cff' : (f.team === 'enemy' && f.armorT > 0 ? '#ff6a3a' : null);
   if (aura) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     glow(ctx, sx, sy - 150, 190, rgba(aura, 0.28 + 0.1 * Math.sin(G.t * 0.1)));

@@ -40,6 +40,8 @@ function shade(hex, amt) {
 function rgba(hex, a) { const [r, g, b] = hexRGB(hex); return `rgba(${r},${g},${b},${a})`; }
 
 /* ---------- Canvas ---------- */
+const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches;
+if (TOUCH) document.documentElement.classList.add('touch');
 const cvs = document.getElementById('game');
 const mainCtx = cvs.getContext('2d');
 let ctx = mainCtx;
@@ -93,8 +95,10 @@ function trackMouse(e) {
   Input.mouse.y = (e.clientY - r.top) / r.height * H;
   Input.mouse.moved = true;
 }
-cvs.addEventListener('mousemove', trackMouse);
-cvs.addEventListener('mousedown', e => { Sound.init(); trackMouse(e); if (!Input.locked) Input.mouse.click = true; });
+cvs.addEventListener('pointermove', trackMouse);
+cvs.addEventListener('pointerdown', e => { Sound.init(); trackMouse(e); if (!Input.locked) Input.mouse.click = true; });
+// iOS only unlocks WebAudio from a touchend/click, not from pointerdown
+for (const ev of ['touchend', 'click']) addEventListener(ev, () => Sound.init(), { passive: true });
 
 /* ---------- Audio (all synthesized, no files) ---------- */
 const Sound = {

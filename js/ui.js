@@ -107,7 +107,7 @@ function drawTitle(c) {
     const a = 0.55 + 0.45 * Math.sin(t * 0.08);
     panel(c, mx, 470, mw, 110, { r: 16, top: 'rgba(20,10,8,0.82)', bot: 'rgba(8,4,4,0.9)' });
     c.save(); c.globalAlpha = a;
-    txt(c, 'PRESS ANY KEY', mx + mw / 2, 528, { font: '900 32px Cinzel, serif', align: 'center', fill: goldGrad(c, 500, 532), stroke: '#120800', sw: 6 });
+    txt(c, TOUCH ? 'TAP TO START' : 'PRESS ANY KEY', mx + mw / 2, 528, { font: '900 32px Cinzel, serif', align: 'center', fill: goldGrad(c, 500, 532), stroke: '#120800', sw: 6 });
     c.restore();
     txt(c, 'Keyboard · best with sound on', mx + mw / 2, 560, { font: '600 14px Cinzel, serif', align: 'center', fill: '#d9c9a3' });
   } else {
@@ -140,7 +140,19 @@ function drawHelp(c) {
   c.fillStyle = 'rgba(5,3,6,0.8)'; c.fillRect(0, 0, W, H);
   panel(c, 230, 60, 820, 600, { r: 18 });
   txt(c, 'HOW TO PLAY', W / 2, 118, { font: '900 40px Cinzel, serif', align: 'center', fill: goldGrad(c, 86, 120), stroke: '#120800', sw: 6 });
-  const rows = [
+  const rows = TOUCH ? [
+    ['MOVE', 'Left thumb-stick  —  touch anywhere on the left side'],
+    ['RUN', 'Push the stick all the way  —  ATTACK while running to dash'],
+    ['ATTACK', 'Tap ATTACK for a 3-hit combo'],
+    ['JUMP', 'JUMP  —  tap ATTACK in the air to jump-kick'],
+    ['RISING ATTACK', 'Stick down, then up, then ATTACK'],
+    ['SPECIAL', 'SPECIAL hits all around, costs a little health'],
+    ['GRAB / THROW', 'Walk into an enemy · ATTACK to knee · JUMP to throw'],
+    ['WEAPONS', 'Pistol, rifle, uzi (hold ATTACK), shotgun, bazooka'],
+    ['DINOSAURS', 'Calm dinosaurs only fight back if you hit them'],
+    ['THE CAR', 'Hell Road: steer with the stick, ATTACK to boost'],
+    ['PAUSE', '❚❚ button at the top  ·  ⛶ for full screen'],
+  ] : [
     ['MOVE', 'Arrow keys  or  W A S D'],
     ['RUN', 'Double-tap left / right  —  Attack while running to dash'],
     ['ATTACK', 'J  or  Z   —  tap for a 3-hit combo'],
@@ -176,7 +188,7 @@ function drawStageSelect(c) {
     txt(c, 'STAGE ' + (i + 1), x + w / 2, y + 290, { font: '700 15px Cinzel, serif', align: 'center', fill: '#bfae86' });
     txt(c, s.name, x + w / 2, y + 314, { font: `900 ${s.name.length > 13 ? 13 : 16}px Cinzel, serif`, align: 'center', fill: sel ? '#f3cf6a' : '#e8dcc0' });
   });
-  txt(c, '← → choose  ·  Enter start  ·  Esc back', W / 2, 620, { font: '600 17px Cinzel, serif', align: 'center', fill: '#d9c9a3' });
+  txt(c, TOUCH ? 'Tap a stage to start' : '← → choose  ·  Enter start  ·  Esc back', W / 2, 620, { font: '600 17px Cinzel, serif', align: 'center', fill: '#d9c9a3' });
 }
 
 /* ---------- Hero select ---------- */
@@ -231,7 +243,7 @@ function drawSelect(c) {
   const h = HEROES[G.selIdx];
   txt(c, h.desc, W / 2, 624, { font: '600 20px Cinzel, serif', align: 'center', fill: '#efe3c8' });
   const royalHint = Save.d.premium ? (G.royal ? 'R  Royal costume: ON' : 'R  Royal costume: OFF') : 'R  Royal costume ♛';
-  txt(c, '← → choose   ·   ENTER / J  fight   ·   ' + royalHint + '   ·   ESC back', W / 2, 668, { font: '600 15px Cinzel, serif', align: 'center', fill: '#bfae86' });
+  txt(c, TOUCH ? 'Tap a hero to fight  ·  ♛ ROYAL for the royal costume' : '← → choose   ·   ENTER / J  fight   ·   ' + royalHint + '   ·   ESC back', W / 2, 668, { font: '600 15px Cinzel, serif', align: 'center', fill: '#bfae86' });
   if (G.startStage > 0) txt(c, 'Starting at stage ' + (G.startStage + 1), W / 2, 698, { font: '600 14px Cinzel, serif', align: 'center', fill: '#f3cf6a' });
 }
 
@@ -312,7 +324,7 @@ function drawHUD(c) {
   }
   if (G.scene === 'play' && G.stageTime < 600 && !G.boss && (G.stageIdx === 0 || G.drive)) {
     c.save(); c.globalAlpha = Math.min(1, (600 - G.stageTime) / 60);
-    const hint = G.drive ? 'Arrows steer  ·  J boost  ·  run them down and ram the biker!'
+    const hint = TOUCH ? (G.drive ? 'Stick steers  ·  ATTACK boosts  ·  ram the biker!' : 'Stick moves (push fully to run)  ·  ATTACK  ·  JUMP  ·  SPECIAL') : G.drive ? 'Arrows steer  ·  J boost  ·  run them down and ram the biker!'
       : 'J attack  ·  K jump  ·  L special  ·  ↓↑+J rising attack  ·  double-tap to run';
     txt(c, hint, W / 2, 706, { font: '700 18px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 5 });
     c.restore();
@@ -371,7 +383,7 @@ function drawClear(c) {
       txt(c, String(shown), W / 2 + 220, y + 2, { font: '600 34px Teko, sans-serif', align: 'right', fill: goldGrad(c, y - 26, y) });
     });
   }
-  if (k > 120 && (k >> 4) % 2) txt(c, 'PRESS ENTER', W / 2, 540, { font: '700 20px Cinzel, serif', align: 'center', fill: '#f3dc9a' });
+  if (k > 120 && (k >> 4) % 2) txt(c, TOUCH ? 'TAP TO CONTINUE' : 'PRESS ENTER', W / 2, 540, { font: '700 20px Cinzel, serif', align: 'center', fill: '#f3dc9a' });
 }
 // Continue screen: the gang boss leans in with a revolver, like the arcade original
 function drawGameOver(c) {
@@ -422,7 +434,7 @@ function drawEnding(c) {
     txt(c, 'Dr. Kaiser is defeated. The dinosaurs roam free once more.', W / 2, 206, { font: '600 20px Cinzel, serif', align: 'center', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.7)', sw: 4 });
     txt(c, 'FINAL SCORE  ' + String(G.score).padStart(8, '0'), W / 2, 248, { font: '600 40px Teko, sans-serif', align: 'center', fill: '#fff4d6', stroke: '#120800', sw: 5 });
     c.restore();
-    if (k > 200 && (k >> 4) % 2) txt(c, 'PRESS ENTER', W / 2, 700, { font: '700 20px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
+    if (k > 200 && (k >> 4) % 2) txt(c, TOUCH ? 'TAP TO CONTINUE' : 'PRESS ENTER', W / 2, 700, { font: '700 20px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
     drawEmbers(c);
     return;
   }
@@ -447,7 +459,7 @@ function drawEnding(c) {
   txt(c, 'Dr. Kaiser is defeated. The dinosaurs roam free once more.', W / 2, 252, { font: '600 20px Cinzel, serif', align: 'center', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.5)', sw: 4 });
   txt(c, 'FINAL SCORE  ' + String(G.score).padStart(8, '0'), W / 2, 298, { font: '600 40px Teko, sans-serif', align: 'center', fill: '#fff4d6', stroke: '#120800', sw: 5 });
   c.restore();
-  if (k > 200 && (k >> 4) % 2) txt(c, 'PRESS ENTER', W / 2, 340, { font: '700 18px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
+  if (k > 200 && (k >> 4) % 2) txt(c, TOUCH ? 'TAP TO CONTINUE' : 'PRESS ENTER', W / 2, 340, { font: '700 18px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
   drawEmbers(c);
 }
 
@@ -470,7 +482,7 @@ function drawTitleCover(c) {
   if (!G.titleReady) {
     const a = 0.55 + 0.45 * Math.sin(t * 0.08);
     c.save(); c.globalAlpha = a;
-    const msg = SPR.loaded < SPR.total ? 'LOADING  ' + Math.round(SPR.loaded / Math.max(1, SPR.total) * 100) + '%' : 'PRESS ANY KEY';
+    const msg = SPR.loaded < SPR.total ? 'LOADING  ' + Math.round(SPR.loaded / Math.max(1, SPR.total) * 100) + '%' : TOUCH ? 'TAP TO START' : 'PRESS ANY KEY';
     txt(c, msg, W / 2, 670, { font: '900 36px Cinzel, serif', align: 'center', fill: goldGrad(c, 638, 674), stroke: '#120800', sw: 6 });
     c.restore();
   } else {
@@ -482,7 +494,7 @@ function drawTitleCover(c) {
       panel(c, x, y, bw, 46, sel ? { r: 23, lw: 2.5, top: 'rgba(110,56,16,0.96)', bot: 'rgba(40,18,6,0.96)' } : { r: 23, lw: 1, top: 'rgba(20,10,8,0.82)', bot: 'rgba(8,4,4,0.9)', border: 'rgba(212,175,55,0.45)', noInner: true });
       txt(c, it.label, x + bw / 2, y + 30, { font: `900 ${sel ? 16 : 14}px Cinzel, serif`, align: 'center', fill: sel ? goldGrad(c, y + 12, y + 34) : (it.lock ? '#8a7a5c' : '#e8dcc0'), stroke: sel ? '#120800' : null, sw: 4 });
     });
-    txt(c, '\u2190 \u2192 choose  \u00B7  Enter select', W / 2, 628, { font: '600 13px Cinzel, serif', align: 'center', fill: 'rgba(240,220,180,0.75)' });
+    txt(c, TOUCH ? 'Tap an option' : '\u2190 \u2192 choose  \u00B7  Enter select', W / 2, 628, { font: '600 13px Cinzel, serif', align: 'center', fill: 'rgba(240,220,180,0.75)' });
   }
   txt(c, 'HI-SCORE ' + String(Save.d.best).padStart(7, '0'), W - 28, 40, { font: '600 26px Teko, sans-serif', align: 'right', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
   txt(c, 'Fan-made tribute \u00B7 not affiliated with Capcom', 28, 36, { font: '600 12px Cinzel, serif', fill: 'rgba(240,220,180,0.7)' });

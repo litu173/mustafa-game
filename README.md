@@ -18,6 +18,10 @@ six bosses, and **online duels, free-for-alls and team-vs-team battles**.
 | Run | Double-tap left or right |
 | Pause / leave match | P or Esc |
 
+**On a phone or tablet:** open the link in the browser. A thumb-stick appears on the left (push it all the way to run) with ATTACK, JUMP and SPECIAL on the right; tap the menus. Play sideways for the biggest view, use ⛶ for full screen on Android, or "Add to Home Screen" on iPhone to launch it full screen like an app.
+
+**Difficulty:** title menu → LEVEL cycles NORMAL / HARD (default) / LEGEND. Villains surround you, sidestep punches, punish whiffed combos and break out of long combos with a COUNTER.
+
 **Story mode:** 6 stages — City in the Sea, Swamp Forest, Hell Road (car chase), Mustafa's Garage, Village of Flame, The Lab.
 
 **Online (title menu → ONLINE):**

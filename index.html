@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#07060a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mustafa">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
 <title>Mustafa: The Dinosaur Wars</title>
 <meta name="description" content="A tribute to the 2002 Mustafa arcade craze: a dinosaur-age beat 'em up with original art.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -175,6 +183,50 @@
     .hub .quicks { grid-template-columns: 1fr; } .hub .heroes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hub .stages { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .hub header { flex-wrap: wrap; } .hub .chan { margin-left: 0; }
   }
+  /* ----- Touch / phones ----- */
+  html.touch, html.touch body { touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  html.touch .modal, html.touch .modal * { touch-action: pan-y; -webkit-user-select: auto; user-select: auto; }
+  html.touch .modal button { touch-action: manipulation; }
+  html.touch input, html.touch textarea, html.touch select { font-size: 16px; } /* no iOS zoom-on-focus */
+  #pad { position: fixed; inset: 0; z-index: 5; pointer-events: none; font-family: Teko, sans-serif; }
+  #pad > * { display: none; }
+  #pad.play > .stick-zone, #pad.play > .btns, #pad.play > .ctx, #pad.select > .ctx { display: block; }
+  #pad.play.portrait > .rotate-tip { display: block; }
+  #pad .stick-zone { position: absolute; left: 0; bottom: 0; width: 46%; height: 62%; pointer-events: auto; touch-action: none; }
+  #pad .stick-base { position: absolute; left: calc(env(safe-area-inset-left) + 110px); top: calc(100% - 110px - env(safe-area-inset-bottom)); width: 128px; height: 128px; margin: -64px 0 0 -64px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(20,12,6,.35) 0 55%, rgba(212,175,55,.08) 56% 100%); border: 2px solid rgba(212,175,55,.45); box-shadow: 0 0 22px rgba(0,0,0,.5) inset; opacity: .7; transition: opacity .15s; }
+  #pad.sticking .stick-base { opacity: 1; }
+  #pad .stick-knob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff3c4, #e3b84a 45%, #8a5f12); border: 2px solid #3a2606; box-shadow: 0 4px 14px rgba(0,0,0,.6); }
+  #pad .btns { position: absolute; right: calc(env(safe-area-inset-right) + 14px); bottom: calc(env(safe-area-inset-bottom) + 14px); width: 236px; height: 200px; }
+  #pad .tb { position: absolute; border-radius: 50%; pointer-events: auto; touch-action: none; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+    color: #fff4d6; font: 600 17px/1 Teko, sans-serif; letter-spacing: .06em; text-shadow: 0 2px 2px #000; border: 2px solid rgba(255,240,200,.55);
+    box-shadow: 0 6px 18px rgba(0,0,0,.55), inset 0 2px 0 rgba(255,255,255,.25); opacity: .82; transition: transform .06s, opacity .06s; }
+  #pad .tb.on { transform: scale(.9); opacity: 1; filter: brightness(1.25); }
+  #pad .t-atk { right: 0; bottom: 0; width: 104px; height: 104px; font-size: 21px; background: radial-gradient(circle at 35% 30%, #ff7a5c, #c0261a 55%, #6a0c08); }
+  #pad .t-jump { right: 116px; bottom: 6px; width: 82px; height: 82px; background: radial-gradient(circle at 35% 30%, #7fd0ff, #1f6fb8 55%, #0b2f5a); }
+  #pad .t-spc { right: 36px; bottom: 116px; width: 74px; height: 74px; font-size: 15px; background: radial-gradient(circle at 35% 30%, #fff1a8, #d4a017 55%, #6e4c06); color: #2a1702; text-shadow: none; }
+  #pad .ctx { position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top) + 8px); height: 0; }
+  #pad .cb { position: absolute; top: 0; display: none; pointer-events: auto; touch-action: manipulation; min-width: 44px; height: 40px; padding: 0 14px; border-radius: 22px; cursor: pointer;
+    font: 700 13px Cinzel, serif; letter-spacing: .06em; color: var(--gold-hi); background: rgba(10,6,4,.7); border: 1px solid rgba(212,175,55,.6); box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+  #pad.play .c-pause { display: block; top: 52px; right: calc(env(safe-area-inset-right) + 62px); width: 44px; padding: 0; }
+  #pad.select .c-back { display: block; left: calc(env(safe-area-inset-left) + 10px); }
+  #pad.select.sel .c-royal { display: block; right: calc(env(safe-area-inset-right) + 10px); }
+  #pad.play .c-full { display: block; top: 52px; right: calc(env(safe-area-inset-right) + 10px); font-size: 18px; padding: 0; width: 44px; }
+  #pad .rotate-tip { position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + 56px); transform: translateX(-50%); white-space: nowrap; font: 700 12px Cinzel, serif; color: var(--muted); }
+  /* portrait phone: game at the top, controls in the space below it */
+  html.touch body { align-items: center; }
+  @media (orientation: portrait) { html.touch body { align-items: flex-start; padding-top: calc(env(safe-area-inset-top) + 64px); } }
+  #pad.portrait .stick-zone { height: 48%; width: 55%; }
+  #pad.portrait .stick-base { opacity: .85; }
+  #pad.play.portrait .c-pause, #pad.play.portrait .c-full { top: 4px; }
+  #pad.portrait .rotate-tip { top: 52%; }
+  @media (max-height: 430px) { #pad .btns { transform: scale(.86); transform-origin: right bottom; } }
+  @media (max-width: 640px) { #online { padding: 0; } .hub { width: 100%; height: 100%; border-radius: 0; } }
+  @media (max-height: 480px) {
+    .hub .tabs button { padding: 8px 12px; } .hub header { padding: 8px 12px; gap: 8px; } .hub .brand .logo { font-size: 20px; }
+    #online { padding: 4px; } .card { padding: 22px 16px 16px; border-radius: 14px; }
+  }
   button:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; }
   @media (max-width: 640px) {
     .card { padding: 26px 18px 20px; }
@@ -185,7 +237,7 @@
 </style>
 </head>
 <body>
-<canvas id="game" tabindex="0" aria-label="Mustafa: The Dinosaur Wars — use the keyboard to play"></canvas>
+<canvas id="game" tabindex="0" aria-label="Mustafa: The Dinosaur Wars — use the keyboard or touch controls to play"></canvas>
 
 <div id="royal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="royalTitle">
   <div class="card">
@@ -235,18 +287,19 @@
 <div id="online" class="modal hidden" role="dialog" aria-modal="true" aria-label="Online arena"><div class="hub"></div></div>
 <div id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=5"></script>
-<script src="js/engine.js?v=5"></script>
-<script src="js/music.js?v=5"></script>
-<script src="js/data.js?v=5"></script>
-<script src="assets/sprites/atlas.js?v=5"></script>
-<script src="js/sprites.js?v=5"></script>
-<script src="js/art.js?v=5"></script>
-<script src="js/bg.js?v=5"></script>
-<script src="js/ui.js?v=5"></script>
-<script src="js/royal.js?v=5"></script>
-<script src="js/arena.js?v=5"></script>
-<script src="js/net.js?v=5"></script>
-<script src="js/game.js?v=5"></script>
+<script src="config.js?v=6"></script>
+<script src="js/engine.js?v=6"></script>
+<script src="js/music.js?v=6"></script>
+<script src="js/data.js?v=6"></script>
+<script src="assets/sprites/atlas.js?v=6"></script>
+<script src="js/sprites.js?v=6"></script>
+<script src="js/art.js?v=6"></script>
+<script src="js/bg.js?v=6"></script>
+<script src="js/ui.js?v=6"></script>
+<script src="js/royal.js?v=6"></script>
+<script src="js/arena.js?v=6"></script>
+<script src="js/net.js?v=6"></script>
+<script src="js/touch.js?v=6"></script>
+<script src="js/game.js?v=6"></script>
 </body>
 </html>
