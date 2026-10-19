@@ -4,30 +4,6 @@
    the gun-to-your-face continue screen and the ending.
    ========================================================= */
 let LOGO = null, SHINE = null;
-function buildLogo() {
-  const cw = 1180, ch = 270, o = document.createElement('canvas');
-  o.width = cw; o.height = ch;
-  const c = o.getContext('2d'), s = 'MUSTAFA', x = cw / 2, y = ch / 2 + 10;
-  // crossed rifles behind the title, like an old arcade marquee
-  for (const [a, dx] of [[-0.32, -40], [0.32, 40]]) {
-    c.save(); c.translate(x + dx, y + 6); c.rotate(a); c.scale(dx < 0 ? 6.4 : -6.4, 6.4);
-    drawWeapon(c, 'rifle', -12, 0, 0, {});
-    c.restore();
-  }
-  c.font = '900 150px "Cinzel Decorative", Cinzel, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  for (let i = 14; i > 0; i--) { c.fillStyle = i > 3 ? '#1c0402' : '#5a1a06'; c.fillText(s, x + i * 0.5, y + i); }
-  c.lineJoin = 'round'; c.lineWidth = 16; c.strokeStyle = '#100200'; c.strokeText(s, x, y);
-  c.lineWidth = 8; c.strokeStyle = goldGrad(c, y - 70, y + 70); c.strokeText(s, x, y);
-  const red = c.createLinearGradient(0, y - 70, 0, y + 70);
-  red.addColorStop(0, '#fff0e6'); red.addColorStop(0.3, '#ff6a4a'); red.addColorStop(0.52, '#a8100c'); red.addColorStop(0.56, '#ff3a2a'); red.addColorStop(1, '#5a0404');
-  c.fillStyle = red; c.fillText(s, x, y);
-  c.save(); c.globalCompositeOperation = 'source-atop';
-  const hl = c.createLinearGradient(0, y - 74, 0, y); hl.addColorStop(0, 'rgba(255,255,255,0.6)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
-  c.fillStyle = hl; c.fillRect(0, y - 80, cw, 70);
-  c.restore();
-  LOGO = o;
-  SHINE = document.createElement('canvas'); SHINE.width = cw; SHINE.height = ch;
-}
 // The MUSTAFA REBORN logo (painted art in assets/logo.png), drawn by width with a light sweep across it.
 function drawLogo(c, cx, cy, width) {
   if (SPR.logo && LOGO !== SPR.logo) {
@@ -44,7 +20,6 @@ function drawLogo(c, cx, cy, width) {
   sc.save(); sc.transform(1, 0, -0.4, 1, 0, 0); sc.fillStyle = g; sc.fillRect(px - 90, 0, 180 + SHINE.height, SHINE.height); sc.restore();
   const w = LOGO.width * scale, h = LOGO.height * scale;
   c.save(); c.globalCompositeOperation = 'lighter'; glow(c, cx, cy, w * 0.5, 'rgba(255,110,40,0.18)'); c.restore();
-  if (LOGO !== SPR.logo) txt(c, 'REBORN', cx, cy + h / 2 + 30 * scale * 4, { font: `900 ${Math.round(160 * scale)}px Cinzel, serif`, align: 'center', fill: '#ff5a2a', stroke: '#120800', sw: 5 });
   c.drawImage(SHINE, cx - w / 2, cy - h / 2, w, h);
 }
 
@@ -66,79 +41,42 @@ function heroLook(i) {
 }
 
 /* ---------- Cover / title ---------- */
+// Loading screen: shown until every painting, sprite and the logo are in, so nobody sees half-drawn art.
+const LOAD_TIPS = ['Push the stick all the way to run', 'Villains break long combos with a COUNTER: hit, move, hit again', 'Stick down, then up, then ATTACK for a rising attack',
+  'Calm dinosaurs only fight back if you hit them', 'Low health? Smash barrels for pizza, hot dogs and meat', 'Royal Pass members keep fighting with unlimited continues'];
+function assetsReady() { return !!SPR.cover && !!SPR.logo && SPR.loaded >= SPR.total; }
 function drawTitle(c) {
-  if (SPR.cover) return drawTitleCover(c);
-  const t = G.t;
-  const g = c.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, '#1a1040'); g.addColorStop(0.32, '#5a2a6a'); g.addColorStop(0.55, '#d0604a'); g.addColorStop(0.72, '#ffb060'); g.addColorStop(1, '#3a1a10');
+  if (assetsReady() && G.loadT === undefined) G.loadT = G.t;          // remember when loading finished
+  if (G.loadT !== undefined && G.t - G.loadT > 18) return drawTitleCover(c);
+  drawLoader(c, G.loadT !== undefined ? 1 - (G.t - G.loadT) / 18 : 1);
+}
+function drawLoader(c, alpha) {
+  const t = G.t, k = SPR.total ? SPR.loaded / SPR.total : 0;
+  G.loadShown = Math.min(k, (G.loadShown || 0) + 0.02);               // smooth bar
+  c.save(); c.globalAlpha = Math.max(0, alpha);
+  const g = c.createRadialGradient(W / 2, H * 0.42, 40, W / 2, H / 2, W * 0.7);
+  g.addColorStop(0, '#3a120a'); g.addColorStop(0.55, '#140706'); g.addColorStop(1, '#050304');
   c.fillStyle = g; c.fillRect(0, 0, W, H);
-  const sx = 700, sy = 470;
-  c.save(); c.globalCompositeOperation = 'lighter'; c.translate(sx, sy); c.rotate(t * 0.0015);
-  for (let i = 0; i < 24; i++) { c.rotate(TAU / 24); c.fillStyle = 'rgba(255,200,120,0.045)'; c.beginPath(); c.moveTo(0, 0); c.lineTo(1100, -50); c.lineTo(1100, 50); c.closePath(); c.fill(); }
-  c.restore();
-  c.save(); c.globalCompositeOperation = 'lighter'; glow(c, sx, sy, 380, 'rgba(255,170,80,0.55)'); c.restore();
-  const sg = c.createLinearGradient(0, sy - 120, 0, sy + 120); sg.addColorStop(0, '#fff8e0'); sg.addColorStop(0.6, '#ffc861'); sg.addColorStop(1, '#ff7a2a');
-  c.fillStyle = sg; c.beginPath(); c.arc(sx, sy, 120, 0, TAU); c.fill();
-  tiles(t * 0.2, 1, 420, (x, i, r) => cloud(c, x, 300 + r * 60, 300, 'rgba(110,40,80,0.45)', 'rgba(255,170,130,0.3)'));
-  for (let k = 0; k < 4; k++) {
-    const px = ((t * (0.7 + k * 0.25) + k * 380) % (W + 400)) - 200;
-    pterosaur(c, px, 230 + k * 40 + Math.sin(t * 0.02 + k) * 18, 0.9 - k * 0.14, t + k * 17, '#2a0c24');
+  // three glowing claw slashes behind the logo
+  c.save(); c.globalCompositeOperation = 'lighter'; c.lineCap = 'round'; c.lineWidth = 26;
+  for (let i = 0; i < 3; i++) {
+    const x = W / 2 - 120 + i * 120, a = 0.12 + 0.08 * Math.sin(t * 0.06 + i);
+    const sg = c.createLinearGradient(x + 120, 60, x - 120, 520);
+    sg.addColorStop(0, 'rgba(255,120,30,0)'); sg.addColorStop(0.5, 'rgba(255,110,30,' + a + ')'); sg.addColorStop(1, 'rgba(255,120,30,0)');
+    c.strokeStyle = sg; c.beginPath(); c.moveTo(x + 130, 70); c.lineTo(x - 110, 500); c.stroke();
   }
-  ridge(c, t * 0.3, 1, 545, 170, 0.004, 4, '#3a1230');
-  ridge(c, t * 0.6, 1, 600, 120, 0.006, 5, '#1e0818');
-  tiles(t * 0.4, 1, 260, (x, i, r) => { if (r < 0.5) palm(c, x, 640, 180 + r * 80, '#120610', r, t); });
-  // the T-rex, roaring
-  const roar = Math.max(0, Math.sin(t * 0.018));
-  const rexP = { ph: 0, jaw: 0.18 + roar * 0.6, lean: -0.1 * roar, rot: 0, lift: 0, head: -0.2 * roar };
-  drawTheropod(c, 1080, 760, -1, 3.1, rexP, { kind: 'rex', col: '#e0892e', stripe: '#8a4210', crest: true });
-  c.fillStyle = '#1a0a0c'; c.beginPath(); c.moveTo(0, H);
-  for (let x = 0; x <= W; x += 30) c.lineTo(x, 668 - Math.abs(Math.sin(x * 0.013) * 14));
-  c.lineTo(W, H); c.closePath(); c.fill();
-  // the car and the four heroes (the cover art)
-  drawCar(c, 470, 690, 1.65, { col: Save.d.premium && G.royal ? '#151515' : '#c0262e', t: 0 });
-  const line4 = [[1, 150, 712, 1.62, 1], [2, 300, 714, 1.62, 1], [3, 700, 716, 1.66, -1]];
-  for (const [i, x, y, s, f] of line4) drawFigure(c, heroLook(i), poseFor(i, 'idle', t), x, y, f, s, { t });
-  drawFigure(c, heroLook(0), poseFor(0, 'idle', t, { weapon: 'rifle' }), 470, 718, 1, 1.85, { t, weapon: 'rifle', aura: Save.d.premium && G.royal ? '#d4af37' : null });
-  const bob = Math.sin(t * 0.03) * 3;
-  drawLogo(c, W / 2, 150 + bob, 460);
-  const rib = Save.d.premium ? '♛  ROYAL MEMBER  ♛' : 'ARCADE LEGEND · ROYAL EDITION';
-  c.save(); c.translate(W / 2, 270 + bob);
-  c.fillStyle = 'rgba(0,0,0,0.5)'; rrect(c, -170, -16, 340, 30, 15); c.fill();
-  c.strokeStyle = 'rgba(212,175,55,0.7)'; c.lineWidth = 1.5; c.stroke();
-  txt(c, rib, 0, 6, { font: '700 15px Cinzel, serif', align: 'center', fill: '#f3dc9a' });
   c.restore();
-  const mx = 880, my = 330, mw = 360;
-  if (!G.titleReady) {
-    const a = 0.55 + 0.45 * Math.sin(t * 0.08);
-    panel(c, mx, 470, mw, 110, { r: 16, top: 'rgba(20,10,8,0.82)', bot: 'rgba(8,4,4,0.9)' });
-    c.save(); c.globalAlpha = a;
-    txt(c, TOUCH ? 'TAP TO START' : 'PRESS ANY KEY', mx + mw / 2, 528, { font: '900 32px Cinzel, serif', align: 'center', fill: goldGrad(c, 500, 532), stroke: '#120800', sw: 6 });
-    c.restore();
-    txt(c, 'Keyboard · best with sound on', mx + mw / 2, 560, { font: '600 14px Cinzel, serif', align: 'center', fill: '#d9c9a3' });
-  } else {
-    const items = titleItems(); G.rects = [];
-    panel(c, mx, my, mw, items.length * 52 + 26, { r: 16, top: 'rgba(20,10,8,0.84)', bot: 'rgba(8,4,4,0.92)' });
-    items.forEach((it, i) => {
-      const y = my + 40 + i * 52, sel = G.menu === i, w = mw - 30, x = mx + 15;
-      G.rects.push({ x, y: y - 22, w, h: 44, i });
-      if (sel) {
-        panel(c, x, y - 22, w, 44, { r: 22, lw: 2, top: 'rgba(80,40,14,0.95)', bot: 'rgba(30,14,6,0.95)' });
-        const pulse = Math.sin(t * 0.15) * 3;
-        txt(c, '◆', x + 20 - pulse, y + 7, { font: '700 15px Cinzel', align: 'center', fill: '#f3cf6a' });
-        txt(c, '◆', x + w - 20 + pulse, y + 7, { font: '700 15px Cinzel', align: 'center', fill: '#f3cf6a' });
-      }
-      txt(c, it.label, mx + mw / 2, y + 8, { font: `900 ${sel ? 23 : 20}px Cinzel, serif`, align: 'center', fill: sel ? goldGrad(c, y - 14, y + 12) : (it.lock ? '#8a7a5c' : '#e8dcc0'), stroke: sel ? '#120800' : null, sw: 5 });
-      if (it.lock) txt(c, '♛', x + w - 40, y + 7, { font: '700 17px serif', align: 'center', fill: '#d4af37' });
-    });
-  }
-  txt(c, 'HI-SCORE ' + String(Save.d.best).padStart(7, '0'), W - 28, 40, { font: '600 26px Teko, sans-serif', align: 'right', fill: '#f3dc9a' });
-  txt(c, 'Fan-made tribute to the 2002 arcade craze · original art · not affiliated with Capcom', W / 2, H - 12, { font: '600 12px Cinzel, serif', align: 'center', fill: 'rgba(240,220,180,0.6)' });
-  drawEmbers(c);
-  c.drawImage(getVignette(), 0, 0);
-  c.strokeStyle = 'rgba(212,175,55,0.55)'; c.lineWidth = 2; c.strokeRect(10, 10, W - 20, H - 20);
-  c.strokeStyle = 'rgba(212,175,55,0.2)'; c.lineWidth = 1; c.strokeRect(16, 16, W - 32, H - 32);
-  if (G.overlay === 'help') drawHelp(c);
-  if (G.overlay === 'stages') drawMissionSelect(c);
+  updateTitleFx(); drawEmbers(c);
+  if (SPR.logo) drawLogo(c, W / 2, H * 0.4, Math.min(620, W * 0.5));
+  else txt(c, 'MUSTAFA REBORN', W / 2, H * 0.42, { font: '600 64px Teko, sans-serif', align: 'center', fill: '#f5c518' });
+  const bw = Math.min(560, W * 0.44), bx = W / 2 - bw / 2, by = H * 0.72;
+  c.fillStyle = 'rgba(255,255,255,0.08)'; rrect(c, bx, by, bw, 10, 5); c.fill();
+  const pg = c.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#d79a00'); pg.addColorStop(1, '#ffe680');
+  c.fillStyle = pg; rrect(c, bx, by, Math.max(10, bw * G.loadShown), 10, 5); c.fill();
+  c.save(); c.globalCompositeOperation = 'lighter'; glow(c, bx + bw * G.loadShown, by + 5, 30, 'rgba(255,200,80,0.5)'); c.restore();
+  txt(c, 'LOADING  ' + Math.round(G.loadShown * 100) + '%', W / 2, by + 44, { font: '600 26px Teko, sans-serif', align: 'center', fill: '#f3dc9a' });
+  txt(c, 'TIP  ·  ' + LOAD_TIPS[Math.floor(t / 240) % LOAD_TIPS.length], W / 2, H - 46, { font: '600 15px Cinzel, serif', align: 'center', fill: 'rgba(240,220,180,0.7)' });
+  c.restore();
 }
 
 function drawHelp(c) {

@@ -913,7 +913,9 @@ function updateWaves() {
 function updateCamera() {
   const st = stageDef(), p = G.players[0];
   if (!p) return;
-  let maxX = st.len - W;
+  // the camera must always be able to reach the next fight zone, even on wide (phone) screens
+  const lastAt = st.waves.length ? st.waves[st.waves.length - 1].at : 0;
+  let maxX = Math.max(st.len - W, lastAt);
   if (G.camLock !== null) maxX = G.camLock;
   else { const w = st.waves[G.waveIdx]; if (w) maxX = Math.min(maxX, w.at); }
   const target = p.x - W * 0.42;
@@ -1020,6 +1022,7 @@ function updTitle() {
     return;
   }
   if (!G.titleReady) {
+    if (G.loadT === undefined || G.t - G.loadT < 18) return;   // still loading
     if (Input.anyKey() || Input.mouse.click) { G.titleReady = true; Music.play('title'); Sound.play('confirm'); }
     return;
   }
@@ -1430,4 +1433,3 @@ Royal.init();
 Net.init();
 loadSprites();
 requestAnimationFrame(frame);
-Promise.race([document.fonts ? document.fonts.ready : Promise.resolve(), new Promise(r => setTimeout(r, 2500))]).then(buildLogo);

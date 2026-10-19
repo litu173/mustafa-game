@@ -33,6 +33,7 @@ const SPRITE_DEFS = {
 const ITEM_IDX = { pizza: 0, hotdog: 1, meat: 2, apple: 3, gem: 4, gold: 5, pistol: 6, rifle: 7, uzi: 8, shotgun: 9, bazooka: 10, grenade: 11, knife: 12, machete: 13, pipe: 14, rock: 15, crate: 16, barrel: 17 };
 
 function loadSprites() {
+  { const im = new Image(); SPR.total++; im.onload = () => { SPR.logo = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/logo.png?v=1'; }
   const atlas = window.ATLAS || {};
   for (const name of Object.keys(atlas)) {
     const im = new Image(); SPR.total++;
@@ -40,7 +41,6 @@ function loadSprites() {
     im.onerror = () => { SPR.total--; };
     im.src = 'assets/sprites/' + name + '.png';
   }
-  { const im = new Image(); SPR.total++; im.onload = () => { SPR.logo = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/logo.png?v=1'; }
   for (const t of ['sea', 'swamp', 'road', 'garage', 'village', 'lab', 'jungle', 'fortress', 'cover']) {
     const im = new Image(); SPR.total++;
     im.onload = () => { if (t === 'cover') SPR.cover = im; else SPR.bg[t] = im; SPR.loaded++; };
