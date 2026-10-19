@@ -52,6 +52,8 @@ const DIFFS = [
   { name: 'LEGEND', aggro: 4, cool: 0.38, spd: 1.3,  dmg: 1.85, hp: 1.35, poise: 3, dodge: 0.5,  punish: 1 },
 ];
 const DIF = () => DIFFS[Save.d.diff ?? 1] || DIFFS[1];
+// the stage being played: a campaign mission, or an online arena
+function stageDef() { return G.arena ? ARENAS[(G.arena.stage | 0) % ARENAS.length] : STAGES[G.stageIdx] || STAGES[0]; }
 function makeEnemy(type, x, y) {
   const d = ENEMY_DEFS[type];
   const look = d.look ? { ...d.look } : null;
@@ -63,7 +65,10 @@ function makeEnemy(type, x, y) {
   if (d.flyer) e.z = 230;
   return e;
 }
-function makeProp(x, y, kind, item) { return { isProp: true, kind, x, y, z: 0, hp: kind === 'barrel' ? 2 : 1, item, flash: 0, remove: false }; }
+function makeProp(x, y, kind, item) {
+  const o = OBJ_PROPS[kind];
+  return { isProp: true, kind, x, y, z: 0, hp: o ? o.hp : kind === 'barrel' ? 2 : 1, item, flash: 0, remove: false, obj: !!o };
+}
 const isHuman = f => !f.def.dino;
 
 /* ---------- effects ---------- */
@@ -155,7 +160,8 @@ function damage(t, a, dmg, m = {}) {
   G.shake = Math.max(G.shake, m.shake || (m.down ? 7 : 3));
   Sound.play(m.down || dmg >= 14 ? 'heavy' : 'punch');
   if (heroHit) {
-    G.combo++; G.comboT = 110; G.comboPop = 10; G.focus = t; G.focusT = 200;
+    G.combo++; G.comboT = 110; G.comboPop = 10;
+    if (G.combo % 10 === 0) { Sound.play('combo'); popText(a.x, a.y, 330, G.combo + ' HIT COMBO!', '#ffd56b', 38); } G.focus = t; G.focusT = 200;
     addScore(dmg * 10);
     popText(t.x, t.y, hz + 30, String(dmg), '#ffe9a8', 30 + Math.min(18, dmg));
   }
@@ -174,7 +180,7 @@ function damage(t, a, dmg, m = {}) {
     G.banner = { title: 'MUTATION!', sub: 'Dr. Kaiser injects the serum', t: 0, dur: 150, warn: true };
     return true;
   }
-  const armor = t.team === 'enemy' && !m.down && t.hp > 0 && (t.armorT > 0 || boss && (t.state === 'attack' || t.state === 'charge' || t.state === 'enter'));
+  const armor = t.team === 'enemy' && !m.down && t.hp > 0 && (t.armorT > 0 || (boss || t.def.heavy) && (t.state === 'attack' || t.state === 'charge' || t.state === 'enter'));
   if (t.state === 'grabbed' && a === t.grabber && t.hp > 0) {
     // stays held
   } else if (t.hp <= 0 || m.down || (t.z > 0 && !boss)) {
@@ -193,7 +199,7 @@ function damage(t, a, dmg, m = {}) {
       t.lastHurt = G.t;
       if (++t.poise >= DIF().poise) {   // shrugs off the combo and hits back
         t.poise = 0; t.armorT = 45; t.cool = 0; t.setState('idle'); t.vx = 0; t.facing = dir > 0 ? -1 : 1;
-        popText(t.x, t.y, hz + 60, 'COUNTER!', '#ff7a5a', 30); Sound.play('roar');
+        popText(t.x, t.y, hz + 60, 'COUNTER!', '#ff7a5a', 30); Sound.play('counter');
       }
     }
   }
@@ -217,12 +223,13 @@ function onKO(t) {
 }
 
 function hitProp(pr) {
-  pr.hp--; pr.flash = 8; Sound.play('punch'); G.hitstop = Math.max(G.hitstop, 2);
+  pr.hp--; pr.flash = 8; Sound.play(pr.obj ? 'metal' : 'punch'); G.hitstop = Math.max(G.hitstop, 2);
   if (pr.hp <= 0) {
     pr.remove = true; Sound.play('break'); G.shake = Math.max(G.shake, 6);
     debris(pr.x, pr.y, pr.kind === 'barrel' ? '#3c6a8a' : '#b07a40');
     if (pr.item) spawnItem(pr.item, pr.x, pr.y);
     addScore(100);
+    if (pr.obj) Mission.onTarget(pr);
   }
 }
 
@@ -327,11 +334,11 @@ function updateCommon(f) {
       if (f.thrown) thrownSweep(f);
       if (f.z <= 0 && f.t > 2) {
         f.z = 0;
-        const wet = STAGES[G.stageIdx].water;
+        const wet = stageDef().water;
         if (f.bounce) {
           f.bounce = false; f.vz = 4.5; f.vx *= 0.45;
           if (wet) { splash(f.x, f.y, 10); Sound.play('splash'); } else dust(f.x, f.y, 8);
-          Sound.play('land'); G.shake = Math.max(G.shake, f.def.boss ? 10 : 5);
+          Sound.play('bodyfall'); G.shake = Math.max(G.shake, f.def.boss ? 10 : 5);
         } else { f.vz = 0; f.vx = 0; f.thrown = false; f.setState('down'); }
       }
       return true;
@@ -440,7 +447,7 @@ function playerFree(p, ix, iy) {
     p.x += ix * sp; p.y += iy * sp * 0.6;
     if (ix) p.facing = ix;
     p.state = 'walk'; p.walkPh += (p.running ? 0.3 : 0.19) * (d.speed / 4.7);
-    if (G.t % 9 === 0 && STAGES[G.stageIdx].water) addPart({ type: 'ring', x: p.x, y: p.y, z: 0, life: 18, size: 70, color: '#cfeee0', flat: true });
+    if (G.t % 9 === 0 && stageDef().water) addPart({ type: 'ring', x: p.x, y: p.y, z: 0, life: 18, size: 70, color: '#cfeee0', flat: true });
     else if (p.running && G.t % 6 === 0) dust(p.x - p.facing * 20, p.y, 1);
     if (ix && !p.weapon && !p.running) { const e = findGrab(p); if (e) startGrab(p, e); }
   } else p.state = 'idle';
@@ -451,7 +458,7 @@ function playerJump(p) {
   if (p.jatk && ++p.jt < 22) hitBox(p, 92, 30, 13 * p.def.power, { down: true, kbx: 5, kbz: 6 });
   if (p.z <= 0) {
     p.z = 0; p.vz = 0; p.jatk = false; p.setState('idle'); Sound.play('land');
-    if (STAGES[G.stageIdx].water) splash(p.x, p.y, 6); else dust(p.x, p.y, 3);
+    if (stageDef().water) splash(p.x, p.y, 6); else dust(p.x, p.y, 3);
   }
 }
 function startSpecial(p) {
@@ -462,7 +469,7 @@ function startSpecial(p) {
 }
 function findGrab(p) {
   for (const e of G.enemies) {
-    if (e.def.boss || e.def.dino || e.z > 0 || !e.canBeHit) continue;
+    if (e.def.boss || e.def.dino || e.leaving || e.z > 0 || !e.canBeHit) continue;
     if (!['idle', 'walk', 'hurt'].includes(e.state)) continue;
     const dx = (e.x - p.x) * p.facing;
     if (dx > 0 && dx < 64 * Math.max(1, e.scale / CS) && Math.abs(e.y - p.y) < 16) return e;
@@ -515,7 +522,7 @@ function pickWeapon(p, it) {
 }
 function respawn(p) {
   p.hp = p.lagHp = p.maxHp; p.koed = false; p.move = null; p.inv = 160; p.facing = 1;
-  if (STAGES[G.stageIdx].drive) { p.setState('drive'); p.z = 0; return; }
+  if (stageDef().drive) { p.setState('drive'); p.z = 0; return; }
   p.weapon = 'bazooka'; p.ammo = GUNS.bazooka.ammo;     // like the arcade: a continue hands you a bazooka
   p.x = clamp(p.x, G.camX + 200, G.camX + W - 200); p.z = 700; p.vz = 0; p.setState('drop');
 }
@@ -592,8 +599,17 @@ function enemyThink(e, p) {
   const D = DIF();
   if (e.cool > 0) e.cool--;
   if (!p) { e.state = 'idle'; return; }
+  const car = G.mission && G.mission.car;
+  if (e.vsCar && car && !car.safe && !e.leaving && Math.abs(p.x - e.x) > 110) {   // raiders go for the Cadillac
+    const cdx = car.x - e.x, cdy = car.y - e.y;
+    if (Math.abs(cdx) > 14) e.facing = cdx > 0 ? 1 : -1;
+    if (Math.abs(cdx) < 190 && Math.abs(cdy) < 34 && e.cool <= 0) { startMove(e, pick(d.melee)); return; }
+    const tx = car.x + (e.x < car.x ? -150 : 150), sp = d.speed * DIF().spd;
+    e.x += clamp(tx - e.x, -sp, sp); e.y += clamp(car.y + e.slotY * 0.5 - e.y, -sp * 0.6, sp * 0.6); e.state = Math.abs(tx - e.x) > 4 ? 'walk' : 'idle';
+    return;
+  }
   const dx = p.x - e.x, dy = p.y - e.y, adx = Math.abs(dx), ady = Math.abs(dy);
-  e.facing = dx >= 0 ? 1 : -1;
+  if (Math.abs(dx) > 14 || e.state !== 'walk' && e.state !== 'idle') e.facing = dx >= 0 ? 1 : -1;
   if (e.dodgeT > 0) {   // hop back out of a punch, then come straight back in
     e.dodgeT--; e.x += e.dodgeDir * d.speed * 2.6; e.state = 'walk'; e.walkPh += 0.3;
     if (e.dodgeT % 4 === 0) dust(e.x, e.y, 1);
@@ -616,6 +632,7 @@ function enemyThink(e, p) {
   if (d.charge && e.cool <= 0 && ady < 28 && adx > 300 && adx < 900 && onScreen(e) && Math.random() < 0.04) {
     e.setState('charge'); e.chargeDir = Math.sign(dx) || 1; return;
   }
+  if (!d.dino && !d.boss && e.cool > 40 && adx > 220 && adx < 520 && Math.random() < 0.004) { e.setState('taunt'); e.t = 30; Sound.play('laugh'); return; }
   if (!pDown && adx < reach && ady < 22 && e.cool <= 0 && (e.aggro || d.boss)) { startMove(e, pick(d.melee)); return; }
   let tx, ty;
   if (d.keepAway) {
@@ -679,7 +696,7 @@ function assignAggro() {
 
 /* ---------- Hell Road: the car stage ---------- */
 function updateDrive() {
-  const st = STAGES[G.stageIdx], d = G.drive, p = G.players[0];
+  const st = stageDef(), d = G.drive, p = G.players[0];
   G.camX += d.speed;
   if (p.inv > 0) p.inv--;
   if (p.flash > 0) p.flash--;
@@ -864,33 +881,37 @@ function spawnEnemy(type) {
   const e = makeEnemy(type, x, rand(BELT_TOP + 10, BELT_BOT - 10));
   e.facing = -side;
   if (d.docile) { e.x = G.camX + rand(300, W - 300); e.state = 'walk'; }
-  if (d.boss) {
+  if (d.boss || d.mini) {
     e.y = (BELT_TOP + BELT_BOT) / 2; e.setState('enter'); G.boss = e;
-    G.banner = { title: 'WARNING', sub: d.name, t: 0, dur: 170, warn: true };
-    Music.play('boss', STAGES[G.stageIdx].transpose || 0);
+    G.banner = { title: d.mini ? 'ELITE' : 'WARNING', sub: d.name, t: 0, dur: 170, warn: true };
+    Music.play(stageDef().id === 'm12' ? 'final' : 'boss', stageDef().transpose || 0);
+    Sound.play('alarm'); Music.stinger('boss');
   }
   G.enemies.push(e);
 }
 function updateWaves() {
-  const st = STAGES[G.stageIdx];
+  const st = stageDef();
   if (G.camLock === null) {
     const w = st.waves[G.waveIdx];
-    if (w && G.camX >= w.at - 1) { G.camLock = w.at; G.camX = w.at; G.queue = w.list.slice(); G.spawnT = 20; G.goT = 0; }
+    if (w && G.camX >= w.at - 1) { G.camLock = w.at; G.camX = w.at; G.queue = w.list.slice(); G.spawnT = 20; G.goT = 0; Mission.onWaveLock(st, G.waveIdx, w); }
     return;
   }
   if (G.spawnT > 0) G.spawnT--;
   const active = G.enemies.filter(e => !e.docile && !e.leaving);
+  const feeding = Mission.feed(st);
   if (G.queue.length && G.spawnT <= 0 && G.enemies.length < (st.maxOn || 4)) { spawnEnemy(G.queue.shift()); G.spawnT = 50; }
   // calm dinosaurs wander off once the fight is over
   if (!G.queue.length && active.length === 0) for (const e of G.enemies) if (e.docile) e.leaving = true;
-  if (!G.queue.length && G.enemies.length === 0) {
+  if (!G.queue.length && G.enemies.length === 0 && !feeding) {
+    if (Mission.targetsLeftIn(G.camLock)) { if (G.t % 240 === 0) popText(G.camX + W / 2, 600, 300, OBJ_PROPS[G.props.find(p => p.obj && !p.remove).kind].label + ' LEFT!', '#7dff9a', 30); return; }
+    if (G.mission) { G.mission.surv = null; if (G.mission.car) G.mission.car.safe = true; }
     G.camLock = null; G.waveIdx++;
     if (G.waveIdx >= st.waves.length) stageClear();
     else { G.goT = 220; Sound.play('go'); }
   }
 }
 function updateCamera() {
-  const st = STAGES[G.stageIdx], p = G.players[0];
+  const st = stageDef(), p = G.players[0];
   if (!p) return;
   let maxX = st.len - W;
   if (G.camLock !== null) maxX = G.camLock;
@@ -919,8 +940,9 @@ function loadStage(i) {
     G.drive = { speed: 11, spawnT: 60, bossOn: false, clearT: 0 };
     p.setState('drive'); p.x = 420; p.y = 610;
   }
+  Mission.init(st);
   G.scene = 'intro'; G.sceneT = 0;
-  Music.play('stage', st.transpose || 0);
+  Music.play(st.music || 'stage', st.transpose || 0);
 }
 function stageClear() {
   const p = G.players[0];
@@ -935,13 +957,13 @@ function saveBest() { if (G.score > Save.d.best) { Save.d.best = G.score; Save.w
 function goOptions() {
   return Save.d.premium
     ? [{ id: 'cont', label: 'CONTINUE' }, { id: 'title', label: 'QUIT TO TITLE' }]
-    : [{ id: 'cont', label: 'CONTINUE  ♛ ROYAL' }, { id: 'restart', label: 'RESTART FROM STAGE 1' }, { id: 'title', label: 'QUIT TO TITLE' }];
+    : [{ id: 'restart', label: 'RETRY MISSION' }, { id: 'cont', label: 'CONTINUE HERE  ♛ ROYAL' }, { id: 'title', label: 'QUIT TO TITLE' }];
 }
 function doContinue() {
   G.lives = Save.d.premium ? 5 : 3; G.score = 0;
   respawn(G.players[0]);
   G.scene = 'play';
-  Music.play(G.boss && G.boss.hp > 0 ? 'boss' : 'stage', STAGES[G.stageIdx].transpose || 0);
+  Music.play(G.boss && G.boss.hp > 0 ? 'boss' : 'stage', stageDef().transpose || 0);
 }
 function toTitle() {
   saveBest();
@@ -969,15 +991,15 @@ function menuInput(n, key, horizontal) {
 }
 
 function titleItems() {
+  const m = Save.d.mission || 0;
   return [
-    { id: 'start', label: 'START GAME' },
-    { id: 'diff', label: 'LEVEL: ' + DIF().name },
-    { id: 'online', label: 'ONLINE \u2694' },
-    { id: 'stages', label: 'STAGE SELECT', lock: !Save.d.premium },
-    { id: 'royal', label: Save.d.premium ? 'ROYAL PASS  ✓' : 'ROYAL PASS  ♛' },
-    { id: 'help', label: 'HOW TO PLAY' },
-    { id: 'pixel', label: Save.d.pixel ? 'DISPLAY: ARCADE' : 'DISPLAY: HD' },
-    { id: 'sound', label: Sound.muted ? 'SOUND: OFF' : 'SOUND: ON' },
+    { id: 'start', label: 'START', sub: m > 0 ? 'CONTINUE · MISSION ' + (m + 1) + ': ' + STAGES[m].name : 'NEW CAMPAIGN · 12 MISSIONS' },
+    { id: 'stages', label: '▦  MISSIONS' },
+    { id: 'online', label: '⚔  ONLINE BATTLE' },
+    { id: 'royal', label: Save.d.premium ? '♛  ROYAL PASS ✓' : '♛  ROYAL PASS' },
+    { id: 'diff', label: '☠  LEVEL: ' + DIF().name },
+    { id: 'help', label: '?  HOW TO PLAY' },
+    { id: 'settings', label: '⚙  SETTINGS' },
   ];
 }
 function updTitle() {
@@ -988,8 +1010,13 @@ function updTitle() {
   }
   if (G.overlay === 'stages') {
     const ch = menuInput(STAGES.length, 'stageSel', true);
+    if (Input.hit('up')) G.stageSel = (G.stageSel + STAGES.length - 4) % STAGES.length;
+    if (Input.hit('down')) G.stageSel = (G.stageSel + 4) % STAGES.length;
     if (Input.hit('back')) { G.overlay = null; return; }
-    if (ch >= 0) { G.startStage = ch; G.overlay = null; goSelect(); }
+    if (ch >= 0) {
+      if (ch > (Save.d.premium ? 99 : Save.d.mission || 0)) { Sound.play('denied'); openRoyal(); return; }
+      G.startStage = ch; G.overlay = null; G.campaign = true; goSelect();
+    }
     return;
   }
   if (!G.titleReady) {
@@ -997,18 +1024,16 @@ function updTitle() {
     return;
   }
   const items = titleItems();
-  if (SPR.cover) { if (Input.hit('up')) Input.pressed.ArrowLeft = true; if (Input.hit('down')) Input.pressed.ArrowRight = true; }
-  const ch = menuInput(items.length, 'menu', !!SPR.cover);
+  const ch = menuInput(items.length, 'menu', false);
   if (ch < 0) return;
   switch (items[ch].id) {
-    case 'start': G.startStage = 0; goSelect(); break;
+    case 'start': campaignNew(); break;
     case 'diff': Save.d.diff = ((Save.d.diff ?? 1) + 1) % DIFFS.length; Save.write(); break;
     case 'online': Net.openHub(); break;
-    case 'stages': if (Save.d.premium) { G.overlay = 'stages'; G.stageSel = 0; } else openRoyal(); break;
+    case 'stages': G.overlay = 'stages'; G.stageSel = Math.min(Save.d.mission || 0, STAGES.length - 1); break;
     case 'royal': openRoyal(); break;
     case 'help': G.overlay = 'help'; break;
-    case 'pixel': Save.d.pixel = !Save.d.pixel; Save.write(); break;
-    case 'sound': Sound.toggleMute(); break;
+    case 'settings': openSettings('title'); break;
   }
 }
 function updSelect() {
@@ -1021,7 +1046,7 @@ function updSelect() {
     return;
   }
   if (Input.hit('back')) { G.scene = 'title'; G.sceneT = 0; return; }
-  if (ch >= 0) startGame(G.startStage);
+  if (ch >= 0) { G.freshRun = true; openBrief(G.startStage); }
 }
 function updIntro() {
   updateParticles();
@@ -1037,7 +1062,7 @@ function updPlay() {
   if (G.hitstop > 0) { G.hitstop--; return true; }
   if (G.slowmo > 0) { G.slowmo--; if (G.slowmo % 3) return true; }
   G.stageTime++;
-  const st = STAGES[G.stageIdx];
+  const st = stageDef();
   if (st.drive) updateDrive(); else for (const p of G.players) updatePlayer(p);
   if (G.scene !== 'play') return false;
   if (G.t % 20 === 0) assignAggro();
@@ -1057,14 +1082,27 @@ function updPlay() {
   if (G.comboPop > 0) G.comboPop--;
   if (G.goT > 0) G.goT--;
   if (!st.drive) { updateCamera(); updateWaves(); }
+  Mission.update();
+  if (G.t % 30 === 0) {
+    const act = G.enemies.filter(e => e.hp > 0 && !e.docile && !e.leaving).length;
+    Music.setIntensity(G.camLock === null ? (act ? 2 : 1) : act >= 4 || (G.mission && G.mission.surv && G.mission.surv.t > 0) ? 3 : 2);
+  }
+  pulseDanger(G.players[0]);
   return false;
+}
+// low health: the music muffles and a heartbeat starts
+function pulseDanger(p) {
+  const low = !!p && p.hp > 0 && p.hp < p.maxHp * 0.3 && p.state !== 'drive';
+  Music.danger(low);
+  if (low && G.t % 48 === 0) Sound.play('heartbeat');
 }
 function updPause() {
   if (Input.hit('pause')) { G.paused = false; return; }
-  const ch = menuInput(3, 'pauseSel');
+  const ch = menuInput(4, 'pauseSel');
   if (ch === 0) G.paused = false;
-  else if (ch === 1) loadStage(G.stageIdx);
-  else if (ch === 2) toTitle();
+  else if (ch === 1) openSettings('pause');
+  else if (ch === 2) loadStage(G.stageIdx);
+  else if (ch === 3) toTitle();
 }
 function updClear() {
   updateParticles();
@@ -1077,8 +1115,7 @@ function updClear() {
   }
   if (G.sceneT > 280 || (G.sceneT > 60 && (Input.confirm() || Input.mouse.click))) {
     if (b.shown < b.total) { G.score += b.total - b.shown; b.shown = b.total; }
-    if (G.stageIdx >= STAGES.length - 1) { G.scene = 'ending'; G.sceneT = 0; Music.play('victory'); saveBest(); }
-    else loadStage(G.stageIdx + 1);
+    afterClear();
   }
 }
 function updGameOver() {
@@ -1093,7 +1130,7 @@ function updGameOver() {
       if (Save.d.premium) doContinue();
       else openRoyal(() => { if (Save.d.premium) { G.goSel = 0; G.sceneT = 0; } });
       break;
-    case 'restart': startGame(0); break;
+    case 'restart': G.score = 0; G.lives = Save.d.premium ? 5 : 3; loadStage(G.stageIdx); break;
     case 'title': toTitle(); break;
   }
 }
@@ -1107,6 +1144,7 @@ function update() {
   Music.update();
   if (Input.hit('mute')) Sound.toggleMute();
   let frozen = false;
+  if (G.settings) { updSettings(); Input.endFrame(); return; }
   switch (G.scene) {
     case 'title': updTitle(); break;
     case 'select': updSelect(); break;
@@ -1115,6 +1153,9 @@ function update() {
     case 'clear': updClear(); break;
     case 'gameover': updGameOver(); break;
     case 'ending': updEnding(); break;
+    case 'story': updStory(); break;
+    case 'brief': updBrief(); break;
+    case 'failed': updFailed(); break;
   }
   if (!frozen) Input.endFrame();
 }
@@ -1217,18 +1258,38 @@ function drawFighterSprite(f, spr, sx, sy, flash) {
       ctx.restore();
     });
   }
-  const breathe = f.state === 'idle' ? 1 + Math.sin((G.t + f.id * 17) * 0.08) * 0.01 : 1;
-  const bob = f.state === 'ride' ? Math.sin(G.t * 0.7) * 2 : 0;
+  // body language: breathing, step bob, lean into the walk, wind-up and lunge, recoil when hit
+  const vis = f.visState || f.state, ph = (G.t + f.id * 17);
+  let breathe = 1, bob = f.state === 'ride' ? Math.sin(G.t * 0.7) * 2 : 0, rot = 0, push = 0, sxk = 1;
+  if (vis === 'idle') { breathe = 1 + Math.sin(ph * 0.08) * (f.team === 'enemy' ? 0.016 : 0.01); rot = Math.sin(ph * 0.045) * 0.012; }
+  else if (vis === 'walk' && !d.flyer) {
+    const sp = Math.min(1, (f.mspd || 0) / 6);
+    bob = -Math.abs(Math.sin((f.dist || 0) / 75 * Math.PI)) * (2 + 3 * sp);
+    rot = face * (0.025 + 0.03 * sp) * (d.dino ? 0.5 : 1);
+  } else if (m && f.team === 'enemy') {
+    const a0 = m.a0 || m.fire || 1, a1 = m.a1 || a0 + 3;
+    if (f.t < a0) { const k = f.t / a0; push = -face * 10 * Math.sin(k * Math.PI * 0.5); rot = -face * 0.05 * k; breathe = 1 + 0.03 * k; }
+    else if (f.t <= a1 + 4) { push = face * 12; rot = face * 0.06; sxk = 1.04; }
+  } else if (f.state === 'hurt') { const k = Math.max(0, 1 - f.t / 12); rot = -face * 0.09 * k; sxk = 1 - 0.05 * k; breathe = 1 + 0.04 * k; }
+  else if (f.state === 'taunt') { breathe = 1 + 0.03 * Math.abs(Math.sin(f.t * 0.2)); rot = Math.sin(f.t * 0.3) * 0.03; }
+  const bx = sx + push;
   // cross-fade: the previous pose lingers faintly for a few frames so pose changes never pop
   const key = spr.sheet + ':' + spr.idx;
   if (f.sprKey !== key) { f.sprPrev = f.sprCur; f.sprCur = spr; f.sprKey = key; f.sprT = 0; }
   f.sprT = (f.sprT || 0) + 1;
-  if (f.sprPrev && f.sprT <= 4 && !flash) {
-    ctx.save(); ctx.globalAlpha *= 0.5 * (1 - f.sprT / 5);
-    drawSprite(ctx, f.sprPrev.sheet, f.sprPrev.idx, sx, sy + bob, face, f.sprPrev.k, { sy: breathe });
+  const cycling = spr.next !== undefined && spr.blend > 0;
+  if (f.sprPrev && f.sprT <= 3 && !flash && !(cycling && f.sprPrev.sheet === spr.sheet)) {
+    ctx.save(); ctx.globalAlpha *= 0.45 * (1 - f.sprT / 4);
+    drawSprite(ctx, f.sprPrev.sheet, f.sprPrev.idx, bx, sy + bob, face, f.sprPrev.k, { sy: breathe, rot, sx: sxk });
     ctx.restore();
   }
-  drawSprite(ctx, spr.sheet, spr.idx, sx, sy + bob, face, spr.k, { flash, sy: breathe });
+  if (d.hue) ctx.filter = `hue-rotate(${d.hue}deg) saturate(1.35) contrast(1.05)`;
+  if (cycling) {
+    // hold each painted frame, then flow into the next one over the second half of its slot
+    const a = clamp((spr.blend - 0.4) / 0.6, 0, 1), e = a * a * (3 - 2 * a);
+    drawSpriteBlend(ctx, spr.sheet, spr.idx, spr.next, e, bx, sy + bob, face, spr.k, { flash, sy: breathe, rot, sx: sxk });
+  } else drawSprite(ctx, spr.sheet, spr.idx, bx, sy + bob, face, spr.k, { flash, sy: breathe, rot, sx: sxk });
+  if (d.hue) ctx.filter = 'none';
   if (f.state === 'charge' && f.t < 26) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     glow(ctx, sx, sy - 120, 160, `rgba(255,80,40,${0.3 + 0.2 * Math.sin(f.t)})`);
@@ -1271,14 +1332,15 @@ function drawParticles() {
   }
 }
 function drawWorld() {
-  const st = STAGES[G.stageIdx];
+  const st = stageDef();
   const sh = G.shake, ox = sh ? rand(-sh, sh) : 0, oy = sh ? rand(-sh, sh) * 0.6 : 0;
   ctx.save(); ctx.translate(ox, oy);
-  drawBackground(ctx, st.theme, G.camX, G.t);
+  drawBackground(ctx, st.theme, G.camX, G.t, st);
   for (const pr of G.props) shadow(pr.x - G.camX, pr.y, 0, CS * 0.9);
   for (const it of G.items) shadow(it.x - G.camX, it.y, it.z, CS * 0.5);
   for (const f of G.enemies) if (!(f.state === 'dead' && (f.t >> 2) % 2 === 0)) shadow(f.x - G.camX, f.y, f.z, f.scale * (f.def.dino ? 1.7 : 1) * (f.def.rider ? 2.5 : 1));
   for (const f of G.players) if (f.state !== 'out') shadow(f.x - G.camX, f.y, f.z, f.state === 'drive' ? 12 : f.scale);
+  if (!G.arena) drawMissionWorld(ctx);
   const list = [];
   for (const o of G.props) list.push([o.y, 0, o]);
   for (const o of G.items) list.push([o.y - 1, 1, o]);
@@ -1299,8 +1361,9 @@ function drawWorld() {
   drawParticles();
   if (G.arena) drawArenaTags(ctx);
   drawForeground(ctx, st.theme, G.camX, G.t);
+  drawWeather(ctx, st, G.camX, G.t);
   ctx.restore();
-  drawGrade(ctx, st.theme, G.t);
+  drawGrade(ctx, st.theme, G.t, st);
   if (G.flash > 0) { ctx.fillStyle = rgba(G.flashCol, Math.min(0.7, G.flash / 24)); ctx.fillRect(0, 0, W, H); }
 }
 
@@ -1313,6 +1376,8 @@ function render() {
     case 'title': drawTitle(ctx); break;
     case 'select': drawSelect(ctx); break;
     case 'ending': drawEnding(ctx); break;
+    case 'story': drawStory(ctx); break;
+    case 'brief': drawBrief(ctx); break;
     default:
       if (Save.d.pixel) {
         // 16-bit arcade look: render the world small, then scale up with hard pixels
@@ -1321,13 +1386,19 @@ function render() {
         ctx = mainCtx; mainCtx.imageSmoothingEnabled = false;
         mainCtx.drawImage(LOW, 0, 0, W, H); mainCtx.imageSmoothingEnabled = true;
       } else drawWorld();
-      if (G.arena) drawArenaHUD(ctx); else drawHUD(ctx);
+      { // HUD stays clear of notches and rounded corners
+        const W0 = W; ctx.save(); ctx.translate(SAFE.l, 0); W = W0 - SAFE.l - SAFE.r;
+        if (G.arena) drawArenaHUD(ctx); else { drawHUD(ctx); drawMissionHUD(ctx); }
+        W = W0; ctx.restore();
+      }
       drawBanner(ctx);
       if (G.scene === 'intro') drawIntro(ctx);
       if (G.scene === 'clear') drawClear(ctx);
       if (G.scene === 'gameover') drawGameOver(ctx);
+      if (G.scene === 'failed') drawFailed(ctx);
       if (G.paused) drawPause(ctx);
   }
+  if (G.settings) drawSettings(ctx);
 }
 
 /* ---------- main loop (fixed 60 Hz simulation) ---------- */

@@ -50,7 +50,7 @@ function startArena(msg) {
   G.combo = 0; G.comboT = 0; G.focus = null; G.banner = { title: 'FIGHT!', sub: modeLabel(), t: 0, dur: 110, big: true };
   G.hitstop = 0; G.slowmo = 0; G.flash = 0; G.shake = 0; G.paused = false;
   G.scene = 'play'; G.sceneT = 0; G.stageTime = 0;
-  Music.play('boss', STAGES[msg.stage].transpose || 0);
+  Music.play('boss', ARENAS[msg.stage % ARENAS.length].transpose || 0);
   Sound.play('confirm');
 }
 function setArenaHost(id) { if (G.arena) { G.arena.host = id; G.arena.isHost = id === G.arena.me; } }
@@ -173,6 +173,7 @@ function arenaUpdate() {
   updateRemotes();
   if (a.ended) { a.endT++; updateParticles(); updateArenaCamera(); if (a.endT > 60 * 7) endArena(); return; }
   a.time++; G.stageTime++;
+  pulseDanger(myFighter && myFighter());
   const me = myFighter();
   if (G.hitstop > 0) G.hitstop--;
   else {

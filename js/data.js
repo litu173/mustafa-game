@@ -80,6 +80,12 @@ const ENEMY_DEFS = {
     name: 'PTERANODON', hp: 34, speed: 4.2, reach: 80, flyer: true, cool: [60, 110], score: 300, dino: 'ptera', radius: 20, col: '#b0703c',
     melee: ['eswoop'],
   },
+  // ---- elite variants (same art, recoloured, much tougher) ----
+  razorX: { spr: 'razor', hue: 190, name: 'FANG ELITE', hp: 82, speed: 4.3, reach: 70, melee: ['eslash', 'edash'], cool: [32, 60], score: 500, weapon: 'knife', drop: { knife: 0.3, pizza: 0.2 }, elite: true },
+  motkaX: { spr: 'motka', hue: 250, name: 'IRON MOTKA', hp: 210, speed: 2.8, reach: 76, melee: ['epunch', 'ebelly', 'eheavy'], cool: [45, 80], score: 900, heavy: true, drop: { meat: 0.6 }, elite: true },
+  poacherX: { spr: 'poacher', hue: 70, name: 'FANG SNIPER', hp: 76, speed: 3.1, reach: 66, melee: ['epunch'], ranged: 'eshoot', keepAway: true, cool: [40, 75], score: 700, weapon: 'rifle', drop: { rifle: 0.5, shotgun: 0.2 }, elite: true },
+  raptorX: { spr: 'raptor', hue: 150, sprScale: 1.22, name: 'ALPHA RAPTOR', hp: 150, speed: 6.0, reach: 110, melee: ['ebite', 'egore'], cool: [30, 60], score: 1500, dino: 'raptor', radius: 30, heavy: true, col: '#3a7a8a', stripe: '#1a3a44', drop: { meat: 0.8 }, elite: true },
+  captain: { spr: 'razor', hue: 320, sprScale: 1.12, name: 'FANG CAPTAIN', hp: 300, speed: 4.0, reach: 80, melee: ['eslash', 'edash', 'eheavy'], cool: [28, 55], score: 3000, weapon: 'knife', heavy: true, mini: true, drop: { meat: 1 }, elite: true },
   // ---- bosses ----
   tusker: {
     name: 'TUSKER', boss: true, hp: 540, speed: 3.8, reach: 150, melee: ['ebite', 'estomp'], charge: true, cool: [35, 70], score: 7000,
@@ -173,66 +179,174 @@ const WEAPONS = [...Object.keys(GUNS), ...Object.keys(THROWN), ...Object.keys(ME
 const FOOD = { pizza: 35, hotdog: 25, meat: 60, apple: 15 };
 const TREASURE = { gem: 2000, gold: 1000 };
 
-/* Stages. waves[].at = camera x where the screen locks.
-   props: [x, y, 'barrel'|'crate', itemInside]. drive: auto-scrolling car stage. */
+/* Campaign missions (the story mode). waves[].at = camera x where the screen locks.
+   props: [x, y, kind, itemInside] — kinds: barrel, crate, and objective targets jammer, tank, lock, cage, hut.
+   obj: what the mission asks for. wave.survive = seconds to hold out; wave.defend = protect the car there.
+   look: time of day / weather for the live background. bark: radio chatter keyed by wave index. */
 const STAGES = [
+  // ---------- CHAPTER 1 · THE DROWNED CITY ----------
   {
-    name: 'CITY IN THE SEA', sub: 'The rooftops of the drowned city', theme: 'sea', transpose: 0, len: 5400, maxOn: 3,
+    id: 'm1', chapter: 0, name: 'DROWNED ROOFTOPS', sub: 'Find the gang’s radio post', theme: 'sea', transpose: 0, len: 5400, maxOn: 4, music: 'sea',
+    obj: { type: 'clear', text: 'Fight through the Black Fang scouts' },
+    brief: 'The Black Fang took Dada Hakim through the drowned city. Their scouts hold the rooftops. Clear a path and find out where the convoy went.',
     waves: [
-      { at: 500, list: ['razor', 'razor'] },
-      { at: 1400, list: ['razor', 'motka', 'razor'] },
-      { at: 2300, list: ['poacher', 'razor', 'lash', 'razor'] },
-      { at: 3200, list: ['raptor', 'razor', 'raptor'] },
-      { at: 4120, list: ['tusker', 'razor', 'razor'], boss: true },
+      { at: 500, list: ['razor', 'razor', 'razor'] },
+      { at: 1400, list: ['razor', 'motka', 'razor', 'lash'] },
+      { at: 2300, list: ['poacher', 'razor', 'lash', 'razor', 'razor'] },
+      { at: 3200, list: ['raptor', 'razor', 'raptor', 'motka'] },
+      { at: 4120, list: ['captain', 'razor', 'razorX', 'razor'], boss: true },
     ],
     props: [[880, 620, 'barrel', 'pizza'], [1750, 540, 'crate', 'pistol'], [2650, 660, 'barrel', 'uzi'], [3550, 580, 'crate', 'hotdog'], [4400, 640, 'barrel', 'meat']],
+    bark: { 0: ['nadia', 'Mustafa, the scouts are on every rooftop. Stay sharp!'], 2: ['rakib', 'Poachers with rifles. Close the distance fast!'], 3: ['nadia', 'Raptors! They smell the blood on those crates.'], 4: ['captain', 'Nobody touches the convoy. Get him!'] },
   },
   {
-    name: 'SWAMP FOREST', sub: 'Poachers wade through the black water', theme: 'swamp', water: true, transpose: 2, len: 5400, maxOn: 4,
+    id: 'm2', chapter: 0, name: 'RADIO SILENCE', sub: 'Night falls on the drowned city', theme: 'sea', look: 'night', weather: 'rain', transpose: -1, len: 5400, maxOn: 4, music: 'stealth',
+    obj: { type: 'destroy', kind: 'jammer', text: 'Destroy the radio jammers' },
+    brief: 'Three jammers are blocking our radio. Smash them so Nadia can track the convoy. Something huge is stirring in the water.',
     waves: [
-      { at: 500, list: ['poacher', 'razor', 'razor'] },
-      { at: 1400, list: ['razor', 'motka', 'poacher'] },
-      { at: 2300, list: ['raptor', 'raptor', 'poacher'] },
-      { at: 3200, list: ['motka', 'lash', 'razor', 'poacher'] },
-      { at: 4120, list: ['butcher', 'razor', 'poacher'], boss: true },
+      { at: 500, list: ['razor', 'poacher', 'razor'] },
+      { at: 1400, list: ['lash', 'razorX', 'razor', 'poacher'] },
+      { at: 2300, list: ['motka', 'razor', 'poacherX', 'razor'] },
+      { at: 3200, list: ['raptor', 'raptor', 'razorX', 'lash'] },
+      { at: 4120, list: ['tusker', 'razor', 'razor'], boss: true },
     ],
-    props: [[800, 650, 'crate', 'shotgun'], [1700, 560, 'barrel', 'meat'], [2600, 620, 'crate', 'grenade'], [3500, 540, 'barrel', 'pizza'], [4450, 650, 'crate', 'gem']],
+    props: [[800, 600, 'jammer'], [1700, 560, 'crate', 'shotgun'], [2500, 620, 'jammer'], [2900, 560, 'barrel', 'pizza'], [3500, 600, 'jammer'], [4400, 640, 'barrel', 'meat']],
+    bark: { 0: ['nadia', 'I see the first jammer. Smash it!'], 2: ['rakib', 'That one has a sniper on it. Careful.'], 3: ['nadia', 'Last jammer! Then I can hear them again.'], 4: ['nadia', 'The water... it is TUSKER! Run or fight!'] },
   },
   {
-    name: 'HELL ROAD', sub: 'Floor it! Black Fang bikers on the highway', theme: 'road', drive: true, transpose: -2, len: 11000,
+    id: 'm3', chapter: 0, name: 'HELL ROAD', sub: 'Catch the convoy before the border', theme: 'road', drive: true, transpose: -2, len: 11000, music: 'chase',
+    obj: { type: 'drive', text: 'Run down the bikers and stop Hog Bahadur' },
+    brief: 'The radio is back: the convoy is racing down Hell Road. Floor the Cadillac, ram the bikers and stop their leader, Hog Bahadur.',
     waves: [], props: [],
   },
+  // ---------- CHAPTER 2 · GREEN VALLEY ----------
   {
-    name: "MUSTAFA'S GARAGE", sub: 'The gang has taken over our garage', theme: 'garage', transpose: 3, len: 5400, maxOn: 4,
+    id: 'm4', chapter: 1, name: 'THE LOST VALLEY', sub: 'Where the dinosaurs are born', theme: 'jungle', transpose: 1, len: 5400, maxOn: 4, music: 'jungle',
+    obj: { type: 'rescue', kind: 'cage', text: 'Free the caged baby dinosaurs' },
+    brief: 'The convoy was a decoy. The real prize is the Green Valley, where the dinosaurs nest. Poachers are caging the babies. Set them free.',
+    waves: [
+      { at: 500, list: ['poacher', 'razor', 'razor'] },
+      { at: 1400, list: ['poacher', 'lash', 'poacherX', 'razor'] },
+      { at: 2300, list: ['trike', 'poacher', 'motka', 'razor'] },
+      { at: 3200, list: ['ptera', 'ptera', 'razorX', 'poacher'] },
+      { at: 4120, list: ['raptorX', 'raptor', 'raptor', 'raptor'], boss: true },
+    ],
+    props: [[900, 610, 'cage'], [1700, 560, 'crate', 'rifle'], [2600, 640, 'cage'], [3000, 560, 'barrel', 'apple'], [3500, 600, 'cage'], [4400, 620, 'barrel', 'meat']],
+    bark: { 0: ['nadia', 'Babies in cages... Mustafa, break those locks!'], 2: ['bablu', 'Do not hit the big one with the horns. It is on our side!'], 4: ['nadia', 'The pack alpha! It thinks we took its young!'] },
+  },
+  {
+    id: 'm5', chapter: 1, name: 'BLACK WATER', sub: 'An ambush in the swamp', theme: 'swamp', look: 'dusk', weather: 'fog', water: true, transpose: 2, len: 4500, maxOn: 5, music: 'stealth',
+    obj: { type: 'survive', text: 'Survive the ambush until Rakib brings the boat' },
+    brief: 'Following the poachers into the swamp was a trap. Hold the line until Rakib arrives with the boat.',
+    waves: [
+      { at: 500, list: ['poacher', 'razor', 'razor'] },
+      { at: 1400, list: ['razorX', 'poacher', 'lash'] },
+      { at: 3220, survive: 75, pool: ['razor', 'razor', 'poacher', 'lash', 'motka', 'razorX', 'raptor', 'poacherX'], list: [] },
+    ],
+    props: [[800, 650, 'crate', 'shotgun'], [1700, 560, 'barrel', 'meat'], [2600, 620, 'crate', 'grenade'], [3500, 600, 'barrel', 'pizza'], [3900, 650, 'crate', 'uzi']],
+    bark: { 0: ['nadia', 'Too quiet. Keep your fists up.'], 2: ['rakib', 'Boat is coming! Hold them off, brother!'] },
+  },
+  {
+    id: 'm6', chapter: 1, name: 'BUTCHER’S CAMP', sub: 'The man who sells dinosaur blood', theme: 'swamp', look: 'night', weather: 'fireflies', water: true, transpose: 2, len: 3600, maxOn: 5, music: 'swamp',
+    obj: { type: 'boss', text: 'Defeat Butcher Bhola' },
+    brief: 'Bhola the Butcher drains captured dinosaurs for Kaiser’s serum. Tonight his camp burns.',
+    waves: [
+      { at: 500, list: ['razor', 'motka', 'poacher', 'razorX'] },
+      { at: 1400, list: ['motkaX', 'poacher', 'lash', 'razor'] },
+      { at: 2320, list: ['butcher', 'razor', 'poacherX', 'razor'], boss: true },
+    ],
+    props: [[800, 600, 'barrel', 'meat'], [1700, 640, 'crate', 'machete'], [2500, 560, 'barrel', 'pizza']],
+    bark: { 1: ['bablu', 'That one is made of iron. Hit, move, hit again!'], 2: ['butcher', 'Fresh meat walked into my kitchen!'] },
+  },
+  // ---------- CHAPTER 3 · HOME UNDER SIEGE ----------
+  {
+    id: 'm7', chapter: 2, name: 'GARAGE TAKEOVER', sub: 'They came for our Cadillac', theme: 'garage', transpose: 3, len: 4500, maxOn: 5, music: 'rock',
+    obj: { type: 'defend', text: 'Protect the Cadillac' },
+    brief: 'While we were in the valley, the gang raided our garage. They want the Cadillac. Over our dead bodies.',
     waves: [
       { at: 500, list: ['biker', 'razor', 'biker'] },
-      { at: 1400, list: ['motka', 'biker', 'lash'] },
-      { at: 2300, list: ['poacher', 'poacher', 'razor', 'biker'] },
-      { at: 3200, list: ['motka', 'biker', 'motka', 'razor', 'lash'] },
-      { at: 4120, list: ['saju', 'biker', 'razor'], boss: true },
+      { at: 1400, list: ['motka', 'biker', 'lash', 'razorX'] },
+      { at: 3220, defend: 800, survive: 60, pool: ['biker', 'biker', 'razor', 'motka', 'razorX', 'lash', 'poacher'], list: [] },
     ],
-    props: [[760, 620, 'crate', 'pipe'], [1680, 560, 'barrel', 'pizza'], [2580, 660, 'crate', 'bazooka'], [3480, 560, 'barrel', 'hotdog'], [4400, 620, 'crate', 'meat']],
+    props: [[760, 620, 'crate', 'pipe'], [1680, 560, 'barrel', 'pizza'], [2580, 660, 'crate', 'bazooka'], [3000, 560, 'barrel', 'hotdog']],
+    bark: { 0: ['rakib', 'My tools! My beautiful tools!'], 2: ['rakib', 'They are going for the car! Do not let them scratch it!'] },
   },
   {
-    name: 'VILLAGE OF FLAME', sub: 'Save the villagers. Leave the beasts in peace', theme: 'village', transpose: -3, len: 5400, maxOn: 4,
+    id: 'm8', chapter: 2, name: 'SHADOW IN THE RAIN', sub: 'Saju strikes from the dark', theme: 'garage', look: 'night', weather: 'storm', transpose: 3, len: 3600, maxOn: 5, music: 'boss',
+    obj: { type: 'boss', text: 'Defeat Shadow Saju' },
+    brief: 'The lights died. Shadow Saju, Kaiser’s assassin, is hunting us in our own home. Trust nothing in the dark.',
+    waves: [
+      { at: 500, list: ['razorX', 'biker', 'lash', 'razor'] },
+      { at: 1400, list: ['motkaX', 'biker', 'razorX', 'lash'] },
+      { at: 2320, list: ['saju', 'razorX', 'biker'], boss: true },
+    ],
+    props: [[760, 620, 'crate', 'pistol'], [1680, 560, 'barrel', 'meat'], [2500, 620, 'crate', 'uzi']],
+    bark: { 0: ['nadia', 'The power is cut. Fight by the lightning!'], 2: ['saju', 'You will not even see the blade.'] },
+  },
+  {
+    id: 'm9', chapter: 2, name: 'VILLAGE OF FLAME', sub: 'Save the villagers', theme: 'village', weather: 'embers', transpose: -3, len: 5400, maxOn: 5, music: 'village',
+    obj: { type: 'rescue', kind: 'hut', text: 'Rescue the villagers from the burning huts' },
+    brief: 'Kaiser burns Shobuj Village to scare the valley into silence. Families are trapped in the huts. Break the doors, get them out.',
     waves: [
       { at: 500, list: ['trike', 'poacher', 'razor', 'razor'] },
-      { at: 1400, list: ['ptera', 'ptera', 'biker', 'razor'] },
+      { at: 1400, list: ['ptera', 'ptera', 'biker', 'razorX'] },
       { at: 2300, list: ['raptor', 'poacher', 'raptor', 'motka'] },
-      { at: 3200, list: ['trike', 'lash', 'poacher', 'ptera', 'biker'] },
-      { at: 4120, list: ['morgol', 'poacher', 'razor'], boss: true },
+      { at: 3200, list: ['trike', 'lash', 'poacherX', 'ptera', 'biker'] },
+      { at: 4120, list: ['captain', 'motkaX', 'poacher', 'razorX'], boss: true },
     ],
-    props: [[820, 600, 'barrel', 'meat'], [1720, 650, 'crate', 'rifle'], [2620, 560, 'barrel', 'pizza'], [3520, 640, 'crate', 'grenade'], [4420, 580, 'barrel', 'meat']],
+    props: [[880, 560, 'hut'], [1720, 650, 'crate', 'rifle'], [2550, 560, 'hut'], [2900, 640, 'barrel', 'pizza'], [3450, 560, 'hut'], [4420, 580, 'barrel', 'meat']],
+    bark: { 0: ['nadia', 'I hear children in that hut! Break the door!'], 3: ['bablu', 'Leave the beasts alone, they are scared of the fire too.'], 4: ['captain', 'Burn it all! Kaiser’s orders!'] },
+  },
+  // ---------- CHAPTER 4 · THE FANG SERUM ----------
+  {
+    id: 'm10', chapter: 3, name: 'MORGOL’S DAM', sub: 'The fortress on the water', theme: 'fortress', weather: 'rain', transpose: -2, len: 5400, maxOn: 5, music: 'fortress',
+    obj: { type: 'destroy', kind: 'lock', text: 'Break the cage locks and free the dinosaurs' },
+    brief: 'The dam fortress is where the captured dinosaurs wait to be drained. Morgol guards it. Free the cages, then deal with him.',
+    waves: [
+      { at: 500, list: ['poacher', 'razorX', 'razor', 'poacher'] },
+      { at: 1400, list: ['motkaX', 'poacherX', 'biker', 'razor'] },
+      { at: 2300, list: ['raptor', 'raptorX', 'poacher', 'lash'] },
+      { at: 3200, list: ['razorX', 'motkaX', 'poacherX', 'biker', 'lash'] },
+      { at: 4120, list: ['morgol', 'poacherX', 'razorX'], boss: true },
+    ],
+    props: [[880, 600, 'lock'], [1720, 650, 'crate', 'grenade'], [2600, 580, 'lock'], [3000, 640, 'barrel', 'meat'], [3500, 600, 'lock'], [4420, 640, 'crate', 'bazooka']],
+    bark: { 0: ['nadia', 'Searchlights everywhere. Break the locks and keep moving!'], 2: ['rakib', 'They are letting raptors loose on the deck!'], 4: ['morgol', 'Every beast in this valley belongs to Kaiser. You too!'] },
   },
   {
-    name: 'THE LAB', sub: "Dr. Kaiser's final experiment", theme: 'lab', transpose: -4, len: 5400, maxOn: 5,
+    id: 'm11', chapter: 3, name: 'SERUM FACTORY', sub: 'Destroy the Fang Serum', theme: 'lab', look: 'alarm', transpose: -4, len: 5400, maxOn: 5, music: 'lab', timer: 300,
+    obj: { type: 'destroy', kind: 'tank', text: 'Destroy the serum tanks before the shipment leaves' },
+    brief: 'Five minutes until the serum shipment leaves the lab. Smash every tank. If it leaves, every poacher in Asia becomes a monster.',
     waves: [
-      { at: 500, list: ['razor', 'poacher', 'lash', 'razor', 'raptor'] },
-      { at: 1400, list: ['motka', 'raptor', 'motka', 'raptor'] },
-      { at: 2300, list: ['poacher', 'poacher', 'lash', 'biker', 'razor'] },
-      { at: 3200, list: ['raptor', 'raptor', 'motka', 'poacher', 'biker', 'lash'] },
-      { at: 4120, list: ['kaiser', 'raptor', 'poacher', 'razor'], boss: true },
+      { at: 500, list: ['razorX', 'poacher', 'lash', 'razor'] },
+      { at: 1400, list: ['motkaX', 'raptor', 'motka', 'raptor'] },
+      { at: 2300, list: ['poacherX', 'poacherX', 'lash', 'biker', 'razorX'] },
+      { at: 3200, list: ['raptorX', 'raptor', 'motkaX', 'poacher', 'biker'] },
     ],
-    props: [[760, 640, 'barrel', 'meat'], [1660, 560, 'crate', 'uzi'], [2560, 620, 'barrel', 'meat'], [3460, 660, 'crate', 'bazooka'], [4380, 560, 'barrel', 'meat']],
+    props: [[760, 600, 'tank'], [1250, 560, 'tank'], [1660, 640, 'crate', 'uzi'], [2550, 580, 'tank'], [3000, 640, 'barrel', 'meat'], [3400, 560, 'tank'], [3700, 640, 'tank']],
+    bark: { 0: ['nadia', 'Alarm! The clock is running, Mustafa!'], 2: ['rakib', 'Those tanks are glass. Hit them hard!'], 3: ['kaiser', 'You are too late. My children are already awake.'] },
   },
+  {
+    id: 'm12', chapter: 3, name: 'DR. KAISER', sub: 'End the Black Fang forever', theme: 'lab', look: 'alarm', transpose: -4, len: 3600, maxOn: 5, music: 'final',
+    obj: { type: 'boss', text: 'Defeat Dr. Kaiser and rescue Dada Hakim' },
+    brief: 'Dada Hakim is in Kaiser’s final chamber. Kaiser has injected himself with the serum. This ends tonight.',
+    waves: [
+      { at: 500, list: ['razorX', 'motkaX', 'poacherX', 'raptorX'] },
+      { at: 1400, list: ['captain', 'raptor', 'razorX', 'lash', 'biker'] },
+      { at: 2320, list: ['kaiser', 'raptor', 'poacherX', 'razorX'], boss: true },
+    ],
+    props: [[760, 640, 'barrel', 'meat'], [1660, 560, 'crate', 'bazooka'], [2500, 620, 'barrel', 'meat']],
+    bark: { 0: ['nadia', 'Hakim is behind that door. Everything we have, Mustafa!'], 2: ['kaiser', 'Behold evolution! Kneel before the new king of the valley!'] },
+  },
+];
+const CHAPTERS = ['THE DROWNED CITY', 'GREEN VALLEY', 'HOME UNDER SIEGE', 'THE FANG SERUM'];
+
+/* Online arenas: open floors for duels and team wars (index is what the server sends). */
+const ARENAS = [
+  { name: 'DROWNED ROOFTOPS', theme: 'sea', transpose: 0 },
+  { name: 'LOST VALLEY', theme: 'jungle', transpose: 1 },
+  { name: 'BLACK SWAMP', theme: 'swamp', water: true, transpose: 2 },
+  { name: 'THE GARAGE', theme: 'garage', transpose: 3 },
+  { name: 'VILLAGE OF FLAME', theme: 'village', weather: 'embers', transpose: -3 },
+  { name: 'DAM FORTRESS', theme: 'fortress', weather: 'rain', transpose: -2 },
+  { name: 'THE LAB', theme: 'lab', look: 'alarm', transpose: -4 },
 ];

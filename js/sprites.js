@@ -36,11 +36,11 @@ function loadSprites() {
   const atlas = window.ATLAS || {};
   for (const name of Object.keys(atlas)) {
     const im = new Image(); SPR.total++;
-    im.onload = () => { SPR.img[name] = im; SPR.flash[name] = tinted(im, '#fff6e0', 1); findHead(name, im); SPR.loaded++; };
+    im.onload = () => { SPR.img[name] = im; SPR.flash[name] = tinted(im, '#fff6e0', 1); findHead(name, im); if (name === 'ptera_f') alignByCrest(name, im); SPR.loaded++; };
     im.onerror = () => { SPR.total--; };
     im.src = 'assets/sprites/' + name + '.png';
   }
-  for (const t of ['sea', 'swamp', 'road', 'garage', 'village', 'lab', 'cover']) {
+  for (const t of ['sea', 'swamp', 'road', 'garage', 'village', 'lab', 'jungle', 'fortress', 'cover']) {
     const im = new Image(); SPR.total++;
     im.onload = () => { if (t === 'cover') SPR.cover = im; else SPR.bg[t] = im; SPR.loaded++; };
     im.onerror = () => { SPR.total--; };
@@ -74,6 +74,25 @@ function findHead(name, im) {
     SPR.head[name] = { cx: n ? sx / n : fr.w / 2, top: Math.max(0, top), size: fr.h * 0.24 };
   } catch (e) { /* canvas tainted (file://) — fall back to drawn heads */ }
 }
+// Flying frames change outline with every wingbeat, so anchor them on the red head crest instead of the feet
+function alignByCrest(name, im) {
+  try {
+    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+    const d = x.getImageData(0, 0, im.width, im.height).data;
+    const ref = window.ATLAS.ptera[1];
+    for (const fr of window.ATLAS[name]) {
+      let sx = 0, sy = 0, n = 0;
+      for (let y = fr.y; y < fr.y + fr.h; y++) for (let i = fr.x; i < fr.x + fr.w; i++) {
+        const p = (y * im.width + i) * 4;
+        if (d[p + 3] > 200 && d[p] > 150 && d[p + 1] < 90 && d[p + 2] < 80) { sx += i; sy += y; n++; }
+      }
+      if (n < 20) continue;
+      fr.ax = sx / n - fr.x - 40; fr.ay = sy / n - fr.y + 70;   // body sits just below and behind the crest
+    }
+    void ref;
+  } catch (e) { /* tainted canvas: keep foot anchors */ }
+}
 const spritesReady = name => !!SPR.img[name];
 
 function spriteScale(key) {
@@ -96,18 +115,49 @@ function drawSprite(c, sheet, idx, x, y, facing, k, o = {}) {
   return true;
 }
 
+// Draw an in-between of two frames of the same sheet: a true cross-fade (premultiplied lerp), so moving
+// limbs flow from one painted pose into the next instead of popping.
+const BLEND = document.createElement('canvas'), blendCtx = BLEND.getContext('2d');
+function drawSpriteBlend(c, sheet, i0, i1, a, x, y, facing, k, o = {}) {
+  const meta = window.ATLAS && window.ATLAS[sheet], im = SPR.img[sheet];
+  if (!meta || !im || o.flash || o.tint || a <= 0.02) return drawSprite(c, sheet, i0, x, y, facing, k, o);
+  if (a >= 0.98) return drawSprite(c, sheet, i1, x, y, facing, k, o);
+  const A = meta[i0], B = meta[i1];
+  const ox = Math.max(A.ax, B.ax), oy = Math.max(A.ay, B.ay);
+  const w = Math.ceil(ox + Math.max(A.w - A.ax, B.w - B.ax)), h = Math.ceil(oy + Math.max(A.h - A.ay, B.h - B.ay));
+  if (BLEND.width < w || BLEND.height < h) { BLEND.width = Math.max(BLEND.width, w); BLEND.height = Math.max(BLEND.height, h); }
+  const b = blendCtx;
+  b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1; b.clearRect(0, 0, w + 2, h + 2);
+  b.globalAlpha = 1 - a; b.drawImage(im, A.x, A.y, A.w, A.h, ox - A.ax, oy - A.ay, A.w, A.h);
+  b.globalCompositeOperation = 'lighter'; b.globalAlpha = a; b.drawImage(im, B.x, B.y, B.w, B.h, ox - B.ax, oy - B.ay, B.w, B.h);
+  b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1;
+  c.save(); c.translate(x, y);
+  if (o.rot) c.rotate(o.rot);
+  c.scale(facing * k * (o.sx || 1), k * (o.sy || 1));
+  c.drawImage(BLEND, 0, 0, w, h, -ox, -oy, w, h);
+  c.restore();
+  return true;
+}
+
 /* ---------- which frame to show for a fighter ----------
    Heroes: a = poses, b = specials, c = 8-9 frame walk cycle, d = jab/cross/kick transitions.
    Gang:   base sheet + _w (6-frame walk, wind-up, recovery). Raptor: _r run cycle. */
 const has = s => !!(window.ATLAS && window.ATLAS[s] && SPR.img[s]);
 const cyc = (sheet, ph, rate) => [sheet, Math.floor(ph / rate) % window.ATLAS[sheet].length];
+// Walk/run cycles advance with the distance actually travelled, so feet never skate and the
+// cadence matches the speed. Returns [sheet, frame, nextFrame, blend].
+function stride(sheet, f, len) {
+  const n = window.ATLAS[sheet].length, p = (f.dist || 0) / len * n, i = Math.floor(p), fr = p - i;
+  return [sheet, i % n, (i + 1) % n, fr];
+}
+const STRIDE = { hero: 150, run: 175, gang: 150, raptor: 250, rex: 330, trike: 210 };
 // pick a frame from a timeline [[untilFrame, sheet, idx], ...]
 function seq(t, list) { for (const s of list) if (t < s[0]) return [s[1], s[2]]; const l = list[list.length - 1]; return [l[1], l[2]]; }
 function heroFrame(f, A, B, C, D) {
   const t = f.t, m = f.move, id = f.def.id, hasC = has(C), hasD = has(D);
   switch (f.state) {
     case 'idle': return hasD ? [D, 0] : [A, 0];
-    case 'walk': return hasC ? cyc(C, f.walkPh, f.running ? 0.55 : 0.7) : [A, [1, 0, 2, 0][Math.floor(f.walkPh / 1.3) % 4]];
+    case 'walk': return hasC ? stride(C, f, f.running ? STRIDE.run : STRIDE.hero) : [A, [1, 0, 2, 0][Math.floor(f.walkPh / 1.3) % 4]];
     case 'jump': case 'drop': return f.jatk ? [B, 1] : [A, 7];
     case 'hurt': case 'grabbed': return [A, 5];
     case 'fall': return t < 5 ? [A, 5] : [A, 6];
@@ -143,7 +193,11 @@ function heroFrame(f, A, B, C, D) {
 const SIGNATURE = { razor: 'taunt', motka: 'ebelly', poacher: 'epunch', lash: 'ekick', butcher: 'ecross', saju: 'edash', morgol: 'eshotgun', kaiser: 'eorb', mutant: 'eorb' };
 function enemyFrame(f, S, key) {
   const t = f.t, m = f.move, Wk = S + '_w', hasW = has(Wk);
-  const walk = ph => hasW ? [Wk, Math.floor(ph / 0.75) % 6] : [S, [1, 0, 2, 0][Math.floor(ph / 1.3) % 4]];
+  const walk = ph => {
+    if (!hasW) return [S, [1, 0, 2, 0][Math.floor(ph / 1.3) % 4]];
+    const p = (f.dist || 0) / STRIDE.gang * 6, i = Math.floor(p);
+    return [Wk, i % 6, (i + 1) % 6, p - i];
+  };
   switch (f.state) {
     case 'idle': return [S, 0];
     case 'walk': case 'enter': return walk(f.walkPh);
@@ -168,19 +222,20 @@ function dinoFrame(f, S, key) {
     if (st === 'swoop') return [S, 3];
     if (st === 'hurt' || st === 'fall') return [S, 4];
     if (st === 'down' || st === 'dead' || st === 'getup') return [S, 5];
+    if (has('ptera_f')) { const p = f.flap / 0.6, i = Math.floor(p); return ['ptera_f', i % 8, (i + 1) % 8, p - i]; }
     return [S, [0, 1, 2, 1][Math.floor(f.flap / 1.2) % 4]];
   }
   if (key === 'trike') {
     if (st === 'attack' || (st === 'charge' && t >= 26)) return [S, 3];
     if (st === 'charge' || st === 'taunt' || st === 'hurt') return [S, 4];
     if (st === 'fall' || st === 'down' || st === 'dead') return [S, 5];
-    if (st === 'walk') return [S, [1, 2][Math.floor(f.walkPh / 1.2) % 2]];
+    if (st === 'walk') return has('trike_w') ? stride('trike_w', f, STRIDE.trike) : [S, [1, 2][Math.floor(f.walkPh / 1.2) % 2]];
     return [S, 0];
   }
   const rex = key === 'rex', run = !rex && has('raptor_r');
   switch (st) {
-    case 'walk': case 'enter': return run ? cyc('raptor_r', f.walkPh, 0.6) : [S, [1, 2][Math.floor(f.walkPh / 1.1) % 2]];
-    case 'charge': return t < 26 ? [S, 3] : run ? cyc('raptor_r', t * 0.6, 0.6) : [S, [1, 2][Math.floor(t / 4) % 2]];
+    case 'walk': case 'enter': return run ? stride('raptor_r', f, STRIDE.raptor) : rex && has('rex_w') ? stride('rex_w', f, STRIDE.rex) : [S, [1, 2][Math.floor(f.walkPh / 1.1) % 2]];
+    case 'charge': return t < 26 ? [S, 3] : run ? stride('raptor_r', f, STRIDE.raptor) : rex && has('rex_w') ? stride('rex_w', f, STRIDE.rex) : [S, [1, 2][Math.floor(t / 4) % 2]];
     case 'taunt': return [S, 3];
     case 'hurt': return [S, rex ? 6 : 5];
     case 'fall': return [S, t < 5 ? (rex ? 6 : 5) : (rex ? 7 : 6)];
@@ -195,20 +250,37 @@ function spriteKeyFor(f) {
   if (f.team === 'hero' || f.hero) return f.def.id;
   if (f.type === 'kaiser' && f.phase2) return 'mutant';
   if (f.type === 'tusker') return 'rex';
-  return f.type;
+  return f.def.spr || f.type;
 }
 // Returns { sheet, idx, k } or null when no sprite is available yet
+function trackMotion(f) {
+  if (f._mt === G.t) return;
+  const dx = f._lx === undefined ? 0 : f.x - f._lx, dy = f._ly === undefined ? 0 : f.y - f._ly;
+  f._lx = f.x; f._ly = f.y; f._mt = G.t;
+  const m = Math.hypot(dx, dy * 1.25);
+  if (m < 40) f.dist = (f.dist || 0) + m;            // ignore teleports / respawns
+  f.mspd = (f.mspd || 0) * 0.78 + Math.min(m, 20) * 0.22;
+  // what the body looks like it is doing: hysteresis stops idle/walk flicker at the end of a step
+  if (f.state === 'idle' || f.state === 'walk') {
+    if (f.mspd > 0.7) f.visState = 'walk'; else if (f.mspd < 0.25) f.visState = 'idle';
+    else if (!f.visState) f.visState = f.state;
+  } else f.visState = null;
+}
 function spriteFor(f) {
   const key = spriteKeyFor(f), d = SPRITE_DEFS[key];
   if (!d || !spritesReady(d.a) || (d.b && !spritesReady(d.b))) return null;
+  trackMotion(f);
+  const realState = f.state;
+  if (f.visState && !f.def.flyer && key !== 'hog') f.state = f.visState;
   let r;
   if (d.b) r = heroFrame(f, d.a, d.b, key + '_c', key + '_d');
   else if (key === 'hog') r = f.state === 'ride' ? [d.a, f.throwT > 0 ? 1 : f.inv > 0 ? 2 : 0] : [d.a, f.state === 'fall' && f.z > 20 ? 3 : 4];
   else if (f.def.dino) r = dinoFrame(f, d.a, key);
   else r = enemyFrame(f, d.a, key);
+  f.state = realState;
   // every sheet is scaled to match its character's base sheet
-  const k = spriteScale(key) * ((window.ATLAS_NORM && window.ATLAS_NORM[r[0]]) || 1);
-  return { sheet: r[0], idx: r[1], k };
+  const k = spriteScale(key) * ((window.ATLAS_NORM && window.ATLAS_NORM[r[0]]) || 1) * (f.def.sprScale || 1);
+  return { sheet: r[0], idx: r[1], next: r[2], blend: r[3] === undefined ? 0 : r[3], k };
 }
 
 /* ---------- items, props, projectiles, vehicles ---------- */

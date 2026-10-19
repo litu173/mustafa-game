@@ -344,8 +344,8 @@ function bgLab(c, cam, t) {
   c.restore();
 }
 
-function drawBackground(c, theme, cam, t) {
-  if (SPR.bg[theme]) { drawPanorama(c, SPR.bg[theme], cam); return; }
+function drawBackground(c, theme, cam, t, st) {
+  if (SPR.bg[theme]) { if (st === false) drawPanorama(c, SPR.bg[theme], cam); else drawPanoramaLive(c, SPR.bg[theme], cam, theme, t, st); return; }
   switch (theme) {
     case 'sea': bgSea(c, cam, t); break;
     case 'swamp': bgSwamp(c, cam, t); break;
@@ -404,15 +404,16 @@ function drawForeground(c, theme, cam, t) {
 
 let VIGNETTE = null;
 function getVignette() {
-  if (!VIGNETTE) {
+  if (!VIGNETTE || VIGNETTE.width !== W) {
     VIGNETTE = document.createElement('canvas'); VIGNETTE.width = W; VIGNETTE.height = H;
     const v = VIGNETTE.getContext('2d'), g = v.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, H * 0.98);
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)'); v.fillStyle = g; v.fillRect(0, 0, W, H);
   }
   return VIGNETTE;
 }
-function drawGrade(c, theme, t) {
-  const tint = { sea: 'rgba(255,140,90,0.05)', swamp: 'rgba(40,120,60,0.08)', road: 'rgba(255,180,90,0.05)', garage: 'rgba(255,160,90,0.04)',
+function drawGrade(c, theme, t, st) {
+  if (st && st.look) gradeLook(c, st.look, t);
+  const tint = (st && st.look) ? null : { sea: 'rgba(255,140,90,0.05)', swamp: 'rgba(40,120,60,0.08)', road: 'rgba(255,180,90,0.05)', garage: 'rgba(255,160,90,0.04)',
     village: `rgba(255,90,30,${0.07 + 0.03 * Math.sin(t * 0.2)})`, lab: 'rgba(40,255,140,0.05)' }[theme];
   if (tint) { c.fillStyle = tint; c.fillRect(0, 0, W, H); }
   c.drawImage(getVignette(), 0, 0);
@@ -424,6 +425,205 @@ function swampMotes(c, cam, t) {
   for (let k = 0; k < 22; k++) {
     const fx = ((hash(k) * W * 1.4 - cam * 0.5 + Math.sin(t * 0.01 + k) * 60) % W + W) % W, fy = 200 + hash(k + 2) * 300 + Math.sin(t * 0.03 + k) * 14;
     glow(c, fx, fy, 12, `rgba(200,255,120,${0.35 + 0.35 * Math.sin(t * 0.08 + k * 3)})`);
+  }
+  c.restore();
+}
+
+/* =========================================================
+   LIVE BACKGROUNDS: the painted panoramas get depth and motion.
+   The far part of each painting scrolls slower than the floor (parallax),
+   and every stage gets its own moving life: clouds, glinting water,
+   waterfalls, mist, searchlights, smoke, birds. Weather and time of day
+   (rain, storm, fog, embers, fireflies / night, dusk, alarm) come from the mission.
+   ========================================================= */
+// where the far scenery ends and the walkable floor begins (fraction of image height), per painting
+const BG_CUT = { sea: 0.49, village: 0.48, jungle: 0.54, fortress: 0.515, swamp: 0.5, garage: 0.5, lab: 0.52, road: 0.56 };
+const BG_FAR = 0.55;   // far layer moves at 55% of the camera speed
+function panoBand(c, img, cam, y0, y1, alpha) {
+  const s = H / img.height, w = img.width * s, sy0 = y0 / s, sh = (y1 - y0) / s;
+  const i0 = Math.floor(cam / w), i1 = Math.floor((cam + W) / w);
+  if (alpha < 1) { c.save(); c.globalAlpha *= alpha; }
+  for (let i = i0; i <= i1; i++) {
+    const x = i * w - cam;
+    if (((i % 2) + 2) % 2) { c.save(); c.translate(x + w, 0); c.scale(-1, 1); c.drawImage(img, 0, sy0, img.width, sh, 0, y0, w, y1 - y0); c.restore(); }
+    else c.drawImage(img, 0, sy0, img.width, sh, x, y0, w, y1 - y0);
+  }
+  if (alpha < 1) c.restore();
+}
+function drawPanoramaLive(c, img, cam, theme, t, st) {
+  const cut = (BG_CUT[theme] || 0.5) * H, far = cam * BG_FAR, band = 36;
+  panoBand(c, img, far, 0, cut + band, 1);                // distant scenery
+  drawSkyLife(c, theme, far, t, st, cut);                 // clouds, birds, water, falls...
+  // the near floor, faded in over a soft seam so the two layers never show a hard edge
+  const steps = 6;
+  for (let i = 0; i < steps; i++) {
+    const y0 = cut - band + i * (band * 2 / steps);
+    panoBand(c, img, cam, y0, y0 + band * 2 / steps + 1, (i + 0.5) / steps);
+  }
+  panoBand(c, img, cam, cut + band, H, 1);
+  drawFloorLife(c, theme, cam, t, st, cut);
+}
+function softCloud(c, x, y, w, col) {
+  const g = c.createRadialGradient(x, y, 0, x, y, w);
+  g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g; c.beginPath(); c.ellipse(x, y, w, w * 0.32, 0, 0, TAU); c.fill();
+}
+function drawSkyLife(c, theme, cam, t, st, cut) {
+  const look = st && st.look, night = look === 'night';
+  c.save();
+  // drifting cloud banks across the sky
+  if (theme !== 'garage' && theme !== 'lab') {
+    const col = theme === 'village' ? 'rgba(40,10,6,0.35)' : night || theme === 'fortress' ? 'rgba(20,24,40,0.4)' : theme === 'sea' ? 'rgba(255,170,140,0.16)' : 'rgba(255,255,255,0.14)';
+    for (let k = 0; k < 7; k++) {
+      const w = 200 + hash(k + 40) * 260, x = ((hash(k) * 2600 - cam * 0.3 - t * (0.15 + hash(k + 9) * 0.25)) % (W + 2 * w) + W + 2 * w) % (W + 2 * w) - w;
+      softCloud(c, x, 40 + hash(k + 20) * cut * 0.42, w, col);
+    }
+  }
+  switch (theme) {
+    case 'sea': {   // sun glints dancing on the water, distant pteranodons
+      c.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 60; k++) {
+        const y = cut * 0.62 + hash(k + 3) * cut * 0.36, x = ((hash(k) * W * 1.3 + Math.sin(t * 0.02 + k) * 18 - cam * 0.2) % W + W) % W;
+        const a = Math.max(0, Math.sin(t * 0.06 + k * 2.3)) * (night ? 0.25 : 0.55);
+        c.fillStyle = night ? `rgba(160,190,255,${a})` : `rgba(255,210,150,${a})`; c.fillRect(x, y, 8 + hash(k + 5) * 22, 2);
+      }
+      if (!night) glow(c, W * 0.35 - (cam * 0.05) % 40, cut * 0.42, 200 + Math.sin(t * 0.03) * 15, 'rgba(255,170,90,0.14)');
+      c.globalCompositeOperation = 'source-over';
+      skyFlyers(c, cam, t, cut, night ? 'rgba(10,10,20,0.8)' : 'rgba(40,20,30,0.75)');
+      break;
+    }
+    case 'jungle': {   // the great waterfall pours, mist rolls, birds circle
+      const im = SPR.bg.jungle, s = H / im.height, w = im.width * s;
+      for (let tile = Math.floor(cam / w); tile <= Math.floor((cam + W) / w); tile++) {
+        const mir = ((tile % 2) + 2) % 2, base = tile * w - cam;
+        for (const fx of [0.46, 0.52, 0.36]) {
+          const x0 = base + (mir ? 1 - fx : fx) * w, fw = 0.05 * w;
+          c.save(); c.beginPath(); c.rect(x0 - fw / 2, 0.21 * H, fw, 0.25 * H); c.clip();
+          c.globalCompositeOperation = 'lighter';
+          for (let k = 0; k < 10; k++) {
+            const y = 0.21 * H + ((t * 3.2 + k * 41) % (0.3 * H)), xx = x0 - fw / 2 + hash(k + fx * 10) * fw;
+            c.fillStyle = 'rgba(220,240,255,0.18)'; c.fillRect(xx, y, 3, 26);
+          }
+          c.restore();
+        }
+      }
+      for (let k = 0; k < 5; k++) softCloud(c, ((hash(k + 7) * 2000 + t * 0.35) % (W + 600)) - 300, cut * 0.82 + Math.sin(t * 0.01 + k) * 10, 260, 'rgba(235,245,240,0.22)');
+      c.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 4; k++) { c.save(); c.translate(W * (0.2 + k * 0.22) - (cam * 0.1) % 200, 0); c.rotate(0.25); c.fillStyle = `rgba(255,250,210,${0.04 + 0.03 * Math.sin(t * 0.02 + k)})`; c.fillRect(-30, -50, 60, cut * 1.3); c.restore(); }
+      c.globalCompositeOperation = 'source-over';
+      skyFlyers(c, cam, t, cut, 'rgba(20,40,30,0.7)');
+      break;
+    }
+    case 'fortress': {   // sweeping searchlights, blinking warning lights, the dam spilling over
+      c.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 3; k++) {
+        const ox = ((k * 640 + 200 - cam * 0.6) % (W + 400) + W + 400) % (W + 400) - 200, a = Math.sin(t * 0.012 + k * 2) * 0.7;
+        c.save(); c.translate(ox, 110); c.rotate(a + 0.6);
+        const g = c.createLinearGradient(0, 0, 0, 700); g.addColorStop(0, 'rgba(230,240,255,0.28)'); g.addColorStop(1, 'rgba(230,240,255,0)');
+        c.fillStyle = g; c.beginPath(); c.moveTo(-6, 0); c.lineTo(6, 0); c.lineTo(120, 700); c.lineTo(-120, 700); c.closePath(); c.fill(); c.restore();
+      }
+      for (let k = 0; k < 14; k++) {
+        if ((t + k * 23) % 90 > 45) continue;
+        const x = ((hash(k) * W * 1.5 - cam * 0.6) % W + W) % W; glow(c, x, 60 + hash(k + 1) * cut * 0.5, 14, 'rgba(255,40,30,0.8)');
+      }
+      for (let k = 0; k < 30; k++) { const x = ((hash(k + 50) * W * 1.6 - cam * 0.55) % W + W) % W, y = cut * 0.45 + ((t * 4 + k * 30) % (cut * 0.4)); c.fillStyle = 'rgba(200,220,255,0.12)'; c.fillRect(x, y, 2, 30); }
+      c.globalCompositeOperation = 'source-over';
+      break;
+    }
+    case 'village': {   // smoke columns and flicker over the burning huts
+      for (let k = 0; k < 6; k++) {
+        const bx = ((hash(k + 3) * W * 1.4 - cam * 0.55) % (W + 300) + W + 300) % (W + 300) - 150;
+        for (let j = 0; j < 6; j++) { const yy = cut * 0.5 - ((t * 0.6 + j * 40 + k * 17) % 260); softCloud(c, bx + Math.sin(t * 0.01 + j) * 30 + j * 6, yy, 70 + j * 16, `rgba(30,12,10,${0.22 - j * 0.03})`); }
+      }
+      c.globalCompositeOperation = 'lighter';
+      glow(c, W / 2, cut * 0.6, W * 0.7, `rgba(255,90,30,${0.05 + 0.04 * Math.sin(t * 0.21) + 0.03 * Math.sin(t * 0.53)})`);
+      c.globalCompositeOperation = 'source-over';
+      break;
+    }
+    case 'swamp': { for (let k = 0; k < 6; k++) softCloud(c, ((hash(k + 11) * 2200 + t * 0.25) % (W + 600)) - 300, cut * 0.8 + Math.sin(t * 0.012 + k) * 12, 300, 'rgba(160,200,170,0.16)'); break; }
+    case 'lab': {
+      c.globalCompositeOperation = 'lighter';
+      const sx = (t * 2.2) % (W + 400) - 200;
+      const g = c.createLinearGradient(sx - 120, 0, sx + 120, 0); g.addColorStop(0, 'rgba(60,255,150,0)'); g.addColorStop(0.5, 'rgba(60,255,150,0.08)'); g.addColorStop(1, 'rgba(60,255,150,0)');
+      c.fillStyle = g; c.fillRect(sx - 120, 0, 240, cut);
+      c.globalCompositeOperation = 'source-over';
+      break;
+    }
+    case 'garage': {
+      if (hash(Math.floor(t / 7)) > 0.93) { c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(0, 0, W, H); }   // a failing tube light
+      break;
+    }
+  }
+  c.restore();
+}
+function skyFlyers(c, cam, t, cut, col) {
+  for (let k = 0; k < 3; k++) {
+    const sp = 0.8 + hash(k + 30) * 0.6, x = ((t * sp + k * 700 - cam * 0.2) % (W + 400)) - 200, y = 70 + hash(k + 31) * cut * 0.35 + Math.sin(t * 0.03 + k) * 14;
+    if (has('ptera_f')) { const i = Math.floor((t * 0.35 + k * 3)) % 8; c.save(); c.globalAlpha = 0.7; c.filter = 'brightness(0.25)'; drawSprite(c, 'ptera_f', i, x, y, 1, 0.16 + k * 0.03); c.filter = 'none'; c.restore(); }
+    else pterosaur(c, x, y, 0.4, t + k * 9, col);
+  }
+}
+function drawFloorLife(c, theme, cam, t, st, cut) {
+  const wet = st && (st.weather === 'rain' || st.weather === 'storm');
+  if (theme === 'sea' || theme === 'fortress' || wet) {   // puddles shimmer
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 16; k++) {
+      const x = ((hash(k + 70) * W * 2 - cam) % (W + 200) + W + 200) % (W + 200) - 100, y = cut + 60 + hash(k + 71) * (H - cut - 80);
+      c.fillStyle = `rgba(255,230,200,${0.05 + 0.05 * Math.sin(t * 0.07 + k)})`; c.beginPath(); c.ellipse(x, y, 40 + hash(k) * 40, 5, 0, 0, TAU); c.fill();
+    }
+    c.restore();
+  }
+}
+function gradeLook(c, look, t) {
+  if (!look) return;
+  c.save();
+  if (look === 'night') {
+    c.globalCompositeOperation = 'multiply'; c.fillStyle = '#5d6aa6'; c.fillRect(0, 0, W, H);
+    c.globalCompositeOperation = 'source-over'; c.fillStyle = 'rgba(8,12,40,0.18)'; c.fillRect(0, 0, W, H);
+  } else if (look === 'dusk') {
+    c.globalCompositeOperation = 'multiply'; c.fillStyle = '#c9a0b8'; c.fillRect(0, 0, W, H);
+    c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(80,30,10,0.12)'; c.fillRect(0, 0, W, H);
+  } else if (look === 'alarm') {
+    c.globalCompositeOperation = 'multiply'; c.fillStyle = '#d8b8b8'; c.fillRect(0, 0, W, H);
+    c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(255,20,10,${0.06 + 0.06 * Math.max(0, Math.sin(t * 0.08))})`; c.fillRect(0, 0, W, H);
+  }
+  c.restore();
+}
+// rain, storm, fog, embers and fireflies over everything; lightning lights up the whole scene
+function drawWeather(c, st, cam, t) {
+  const w = st && st.weather; if (!w) return;
+  c.save();
+  if (w === 'rain' || w === 'storm') {
+    const n = w === 'storm' ? 160 : 110;
+    c.strokeStyle = 'rgba(200,215,240,0.35)'; c.lineWidth = 1.5; c.beginPath();
+    for (let k = 0; k < n; k++) {
+      const sp = 22 + hash(k + 1) * 10, x = ((hash(k) * W * 1.3 + t * 5 - cam * 0.9) % (W + 100) + W + 100) % (W + 100) - 50, y = (hash(k + 2) * H + t * sp) % (H + 60) - 30;
+      c.moveTo(x, y); c.lineTo(x - 7, y + 26);
+    }
+    c.stroke();
+    c.fillStyle = 'rgba(220,230,255,0.35)';
+    for (let k = 0; k < 26; k++) { if ((t + k * 7) % 12 > 5) continue; const x = hash(k * 3 + Math.floor(t / 12)) * W, y = BELT_TOP + hash(k * 5 + Math.floor(t / 12)) * (H - BELT_TOP); c.beginPath(); c.ellipse(x, y, 7, 2, 0, 0, TAU); c.fill(); }
+    if (w === 'storm') {
+      const cyc = t % 400, strike = hash(Math.floor(t / 400)) > 0.25;
+      if (strike && cyc < 14) {
+        c.fillStyle = `rgba(230,235,255,${(cyc % 6 < 3 ? 0.55 : 0.2) * (1 - cyc / 14)})`; c.fillRect(0, 0, W, H);
+        if (cyc === 0 && G.scene === 'play') Sound.play('boom');
+      }
+    }
+  } else if (w === 'fog') {
+    for (let k = 0; k < 5; k++) softCloud(c, ((hash(k + 90) * 2400 + t * (0.4 + k * 0.1) - cam * 0.3) % (W + 800) + W + 800) % (W + 800) - 400, BELT_TOP + 40 + k * 40, 420, 'rgba(190,210,200,0.2)');
+  } else if (w === 'embers') {
+    c.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 50; k++) {
+      const x = ((hash(k) * W * 1.3 + Math.sin(t * 0.01 + k) * 40 - cam * 0.3) % W + W) % W, y = H - ((t * (0.7 + hash(k + 3)) * 1.6 + hash(k + 7) * H) % H);
+      c.fillStyle = `rgba(255,${130 + (k * 7) % 100},40,${0.5 + 0.5 * hash(k + 1)})`; c.fillRect(x, y, 3, 3);
+    }
+  } else if (w === 'fireflies') {
+    c.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 26; k++) {
+      const fx = ((hash(k) * W * 1.4 - cam * 0.5 + Math.sin(t * 0.01 + k) * 60) % W + W) % W, fy = 200 + hash(k + 2) * 420 + Math.sin(t * 0.03 + k) * 14;
+      glow(c, fx, fy, 12, `rgba(200,255,120,${0.35 + 0.35 * Math.sin(t * 0.08 + k * 3)})`);
+    }
   }
   c.restore();
 }

@@ -18,7 +18,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const CHANNELS = ['Global', 'Bangladesh', 'Asia', 'Europe', 'Americas'];
 const MODES = { duel: { max: 2, label: 'Duel 1v1' }, ffa: { max: 4, label: 'Free-for-all' }, team: { max: 8, label: 'Team vs Team' } };
 const HEROES = ['mustafa', 'rakib', 'nadia', 'bablu'];
-const STAGE_COUNT = 6;
+const STAGE_COUNT = 7;   // online arenas (ARENAS in js/data.js)
 
 /* ---------- persistence (friends + teams survive restarts) ---------- */
 let db = { users: {}, teams: {} };

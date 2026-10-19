@@ -914,6 +914,7 @@ function drawItemSprite(c, kind, x, y, t) {
   c.restore();
 }
 function drawPropSprite(c, pr, x, y) {
+  if (OBJ_PROPS[pr.kind]) return drawObjProp(c, pr, x, y);
   const fl = pr.flash > 0;
   if (spritesReady('items')) { drawSprite(c, 'items', ITEM_IDX[pr.kind], x + (fl ? rand(-3, 3) : 0), y, 1, pr.kind === 'barrel' ? 0.6 : 0.62, { flash: fl }); return; }
   c.save(); c.translate(x + (fl ? rand(-2, 2) : 0), y); c.scale(CS * 0.85, CS * 0.85);

@@ -11,7 +11,7 @@ const MODE_INFO = {
   team: { title: 'Team Battle', short: 'TEAM BATTLE', sub: 'Up to 4 vs 4 · red team vs blue team', icon: '⚑' },
 };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const stageImg = i => `assets/bg/${(STAGES[i] || STAGES[0]).theme}.jpg?v=3`;
+const stageImg = i => `assets/bg/${(ARENAS[i] || ARENAS[0]).theme}.jpg?v=3`;
 
 function serverURL() {
   const cfg = (window.MUSTAFA_SERVER || '').trim();
@@ -78,7 +78,7 @@ const Net = {
       case 'channel': this.channel = m.name; this.players = m.players; this.rooms = m.rooms; this.channels = m.channels; break;
       case 'social': this.social = m; break;
       case 'room': this.room = m.room; if (m.room) this.tab = 'play'; break;
-      case 'chat': this.chat.push(m); if (this.chat.length > 120) this.chat.shift(); break;
+      case 'chat': this.chat.push(m); if (this.chat.length > 120) this.chat.shift(); if (!this.chatOpen && m.from !== this.me.id) this.unread = (this.unread || 0) + 1; break;
       case 'toast': this.toast(m.text); break;
       case 'invite': this.invites.push(m); Sound.play('select'); break;
       case 'start': case 'resume': this.hideHub(); startArena(m); return;
@@ -168,8 +168,11 @@ const Net = {
     if (this.tab === 'play') main = this.room ? this.roomView() : this.lobbyView();
     else if (this.tab === 'friends') main = this.friendsView();
     else main = this.teamView();
+    if (this.chatOpen === undefined) this.chatOpen = innerWidth > 980;
     this.el.querySelector('.hub').innerHTML = `${head}${invites ? `<div class="invites">${invites}</div>` : ''}
-      <div class="body"><div class="main">${main}</div>${this.chatView()}</div>`;
+      <div class="body ${this.chatOpen ? '' : 'nochat'}"><div class="main">${main}</div>${this.chatOpen ? this.chatView() : ''}</div>
+      <button class="chatfab" data-act="chatToggle">${this.chatOpen ? '✕' : '💬'}${!this.chatOpen && this.unread ? `<b>${this.unread}</b>` : ''}</button>`;
+    if (this.chatOpen) this.unread = 0;
     for (const [id, v] of Object.entries(keep)) { const inp = document.getElementById(id); if (inp && id !== 'nameInput') inp.value = v; }
     if (focused) { const f = document.getElementById(focused); if (f) f.focus(); }
     const msgs = document.getElementById('msgs'); if (msgs) msgs.scrollTop = msgs.scrollHeight;
@@ -179,39 +182,48 @@ const Net = {
     return `<div class="heroes">${Object.keys(HERO_NAMES).map(h => `<button class="hero ${cur === h ? 'sel' : ''}" data-act="hero" data-hero="${h}">
       ${this.body(h, 92, 120)}<b>${HERO_NAMES[h]}</b><small>${HERO_ROLE[h]}</small></button>`).join('')}</div>`;
   },
+  // PUBG-style lobby: your fighter centre stage, pick a mode, one big button
+  heroCarousel(cur) {
+    const keys = Object.keys(HERO_NAMES), i = Math.max(0, keys.indexOf(cur));
+    return `<div class="showcase">
+      <button class="arrow" data-act="heroStep" data-d="-1" aria-label="Previous fighter">◀</button>
+      <div class="stagehero">${this.body(cur, 230, 290)}<div class="plinth"></div><b>${HERO_NAMES[cur]}</b><small>${HERO_ROLE[cur]}</small>
+        <div class="dots">${keys.map((k, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div></div>
+      <button class="arrow" data-act="heroStep" data-d="1" aria-label="Next fighter">▶</button></div>`;
+  },
   lobbyView() {
     const waiting = mode => this.rooms.filter(r => r.quick && r.mode === mode && r.status === 'open').reduce((n, r) => n + r.count, 0);
-    const quick = Object.entries(MODE_INFO).map(([k, v], i) => `<button class="quick q-${k}" data-act="quick" data-mode="${k}" style="background-image:linear-gradient(180deg,rgba(10,5,4,.15),rgba(10,5,4,.92)),url(${stageImg([0, 4, 3][i])})">
-        <span class="qicon">${v.icon}</span><span class="qt">${v.title.toUpperCase()}</span><span class="qs">${v.sub}</span>
-        <span class="qw">${waiting(k) ? `● ${waiting(k)} waiting` : 'Find a match'}</span></button>`).join('');
+    const qm = this.qmode || 'duel';
+    const modes = Object.entries(MODE_INFO).map(([k, v], i) => `<button class="mode-card ${qm === k ? 'sel' : ''}" data-act="qmode" data-mode="${k}" style="background-image:linear-gradient(90deg,rgba(10,5,4,.92),rgba(10,5,4,.35)),url(${stageImg([0, 4, 5][i])})">
+        <span class="qicon">${v.icon}</span><span><b>${v.title.toUpperCase()}</b><small>${v.sub}</small></span>
+        ${waiting(k) ? `<em>${waiting(k)} waiting</em>` : ''}</button>`).join('');
     const live = this.rooms.map(r => {
-      const sides = r.mode === 'team' ? ['A', 'B'] : null;
-      const faces = sides
-        ? sides.map(sd => `<div class="faces s${sd}">${r.players.filter(p => p.side === sd).map(p => this.avatar(p.hero, 30)).join('') || '<i class="emptyface">?</i>'}</div>`).join('<span class="vs">VS</span>')
-        : r.players.map(p => this.avatar(p.hero, 30)).join('<span class="vs">VS</span>') + (r.count < r.max ? `${r.count ? '<span class="vs">VS</span>' : ''}<i class="emptyface">?</i>` : '');
       const playing = r.status === 'playing', full = r.count >= r.max;
-      return `<div class="card match ${playing ? 'live' : ''}" style="background-image:linear-gradient(180deg,rgba(8,4,4,.25) 0%,rgba(8,4,4,.95) 78%),url(${stageImg(r.stage)})">
-        <div class="mtop"><span class="mode m-${r.mode}">${MODE_INFO[r.mode].short}</span><span class="st ${playing ? 'fight' : 'open'}">${playing ? '● FIGHTING' : `OPEN ${r.count}/${r.max}`}</span></div>
-        <div class="mname">${esc(r.name)}</div><div class="mstage">${esc((STAGES[r.stage] || {}).name || '')}</div>
-        <div class="mfaces">${faces}</div>
-        <div class="mnames">${r.players.map(p => esc(p.name)).join(' · ')}</div>
-        ${playing ? '<button class="btn wide" disabled>In progress</button>' : full ? '<button class="btn wide" disabled>Full</button>' : `<button class="btn gold wide" data-act="joinRoom" data-id="${r.id}">JOIN FIGHT</button>`}
+      const faces = r.players.map(p => this.avatar(p.hero, 26)).join('<span class="vs">VS</span>') + (r.count < r.max ? '<i class="emptyface">?</i>' : '');
+      return `<div class="card match ${playing ? 'live' : ''}" style="background-image:linear-gradient(180deg,rgba(8,4,4,.2) 0%,rgba(8,4,4,.95) 75%),url(${stageImg(r.stage)})">
+        <div class="mtop"><span class="mode m-${r.mode}">${MODE_INFO[r.mode].short}</span><span class="st ${playing ? 'fight' : 'open'}">${playing ? '● LIVE' : `${r.count}/${r.max}`}</span></div>
+        <div class="mname">${esc(r.name)}</div><div class="mfaces">${faces}</div>
+        ${playing ? '<button class="btn wide" disabled>Fighting…</button>' : full ? '<button class="btn wide" disabled>Full</button>' : `<button class="btn gold wide" data-act="joinRoom" data-id="${r.id}">JOIN</button>`}
       </div>`;
     }).join('');
     const others = this.players.filter(p => p.id !== this.me.id);
     const friends = new Set(this.social.friends.map(f => f.id));
-    const online = others.map(p => `<div class="pchip">${this.avatar(p.hero, 38)}<div class="pinfo"><b>${esc(p.name)}</b><small><i class="dot ${p.status === 'idle' ? 'on' : 'busy'}"></i>${p.status === 'idle' ? 'Ready to fight' : esc(p.status)}${p.team ? ' · ' + esc(p.team) : ''}</small></div>
+    const online = others.map(p => `<div class="pchip">${this.avatar(p.hero, 34)}<div class="pinfo"><b>${esc(p.name)}</b><small><i class="dot ${p.status === 'idle' ? 'on' : 'busy'}"></i>${p.status === 'idle' ? 'Ready' : esc(p.status)}</small></div>
         ${p.status === 'idle' ? `<button class="btn sm gold" data-act="challenge" data-id="${p.id}">⚔ Duel</button>` : ''}
         ${friends.has(p.id) ? '<span class="tagf">♥</span>' : `<button class="btn sm" data-act="friend" data-id="${p.id}" title="Add friend">+♥</button>`}</div>`).join('');
     const create = this.creating ? `<div class="create">
         <div class="row">${Object.entries(MODE_INFO).map(([k, v]) => `<button class="chip ${this.newMode === k ? 'sel' : ''}" data-act="newMode" data-mode="${k}">${v.icon} ${v.title}</button>`).join('')}</div>
-        <div class="stages">${STAGES.map((st, i) => `<button class="stage ${this.newStage === i ? 'sel' : ''}" data-act="newStage" data-i="${i}" style="background-image:url(${stageImg(i)})"><span>${esc(st.name)}</span></button>`).join('')}</div>
-        <div class="row"><button class="btn gold" data-act="createRoom">Create match</button><button class="btn" data-act="toggleCreate">Cancel</button></div></div>` : '';
-    return `<section><h3>CHOOSE YOUR FIGHTER</h3>${this.heroPicker(this.me.hero)}</section>
-      <section><h3>PLAY NOW</h3><div class="quicks">${quick}</div></section>
-      <section><div class="sechead"><h3>LIVE FIGHTS <small>#${esc(this.channel || '')}</small></h3><button class="btn sm" data-act="toggleCreate">${this.creating ? 'Close' : '+ Create custom match'}</button></div>
-        ${create}<div class="matches">${live || '<div class="empty big">No fights yet — hit <b>Quick Duel</b> to start one and others will join you.</div>'}</div></section>
-      <section><h3>ONLINE NOW <small>${others.length} player${others.length === 1 ? '' : 's'}</small></h3><div class="pchips">${online || '<div class="empty">You are the only one here. Share the game link with friends!</div>'}</div></section>`;
+        <div class="stages">${ARENAS.map((st, i) => `<button class="stage ${this.newStage === i ? 'sel' : ''}" data-act="newStage" data-i="${i}" style="background-image:url(${stageImg(i)})"><span>${esc(st.name)}</span></button>`).join('')}</div>
+        <div class="row"><button class="btn gold" data-act="createRoom">Create private match</button><button class="btn" data-act="toggleCreate">Cancel</button></div></div>` : '';
+    return `<div class="lobby">
+        ${this.heroCarousel(this.me.hero)}
+        <div class="playcol"><div class="modes">${modes}</div>
+          <button class="findbtn" data-act="quick" data-mode="${qm}">⚔ FIND MATCH<small>${MODE_INFO[qm].title} · starts automatically</small></button>
+          <button class="linkbtn" data-act="toggleCreate">${this.creating ? 'Close' : 'Play with friends: create a private match'}</button></div>
+      </div>
+      ${create}
+      <section><h3>LIVE FIGHTS <small>#${esc(this.channel || '')} · tap JOIN to jump in</small></h3><div class="strip">${live || '<div class="empty">No fights yet. Press <b>FIND MATCH</b> and others will join you.</div>'}</div></section>
+      <section><h3>ONLINE NOW <small>${others.length}</small></h3><div class="pchips">${online || '<div class="empty">Nobody else is here yet. Share the game link with friends!</div>'}</div></section>`;
   },
   roomView() {
     const r = this.room, me = this.me, isHost = r.host === me.id, mine = r.players.find(p => p.id === me.id) || {};
@@ -233,10 +245,10 @@ const Net = {
     const cd = r.countdown ? Math.ceil(r.countdown / 1000) : 0;
     const status = cd ? `<div class="countdown">FIGHT STARTS IN <b>${cd}</b></div>` : r.quick ? `<div class="countdown wait">Looking for opponents… the fight starts automatically</div>` : '';
     return `<div class="banner" style="background-image:linear-gradient(90deg,rgba(8,4,4,.92),rgba(8,4,4,.35)),url(${stageImg(r.stage)})">
-        <span class="mode m-${r.mode}">${MODE_INFO[r.mode].short}</span><h2>${esc(r.name)}</h2><p>${esc((STAGES[r.stage] || {}).name || '')} · ${r.players.length}/${r.max} fighters</p>${status}</div>
+        <span class="mode m-${r.mode}">${MODE_INFO[r.mode].short}</span><h2>${esc(r.name)}</h2><p>${esc((ARENAS[r.stage] || {}).name || '')} · ${r.players.length}/${r.max} fighters</p>${status}</div>
       <div class="vsarea ${r.mode === 'team' ? 'team' : ''}">${arena}</div>
-      <section><h3>YOUR FIGHTER</h3>${this.heroPicker(mine.hero)}</section>
-      ${isHost && !r.quick ? `<section><h3>STAGE</h3><div class="stages">${STAGES.map((st, i) => `<button class="stage ${r.stage === i ? 'sel' : ''}" data-act="roomStage" data-i="${i}" style="background-image:url(${stageImg(i)})"><span>${esc(st.name)}</span></button>`).join('')}</div></section>` : ''}
+      <section><h3>YOUR FIGHTER</h3>${this.heroCarousel(mine.hero || this.me.hero)}</section>
+      ${isHost && !r.quick ? `<section><h3>STAGE</h3><div class="stages">${ARENAS.map((st, i) => `<button class="stage ${r.stage === i ? 'sel' : ''}" data-act="roomStage" data-i="${i}" style="background-image:url(${stageImg(i)})"><span>${esc(st.name)}</span></button>`).join('')}</div></section>` : ''}
       <div class="actions">
         ${r.quick ? '' : isHost ? `<button class="btn gold big" data-act="start">⚔ START FIGHT</button>` : `<button class="btn ${mine.ready ? '' : 'gold'} big" data-act="ready">${mine.ready ? 'Cancel ready' : '✓ I\'M READY'}</button>`}
         <button class="btn big" data-act="leaveRoom">Leave</button></div>`;
@@ -301,13 +313,16 @@ const Net = {
       case 'hero': this.me.hero = d.hero; this.saveIdent({ hero: d.hero }); G.selIdx = Math.max(0, HEROES.findIndex(h => h.id === d.hero));
         this.send({ t: 'profile', hero: d.hero }); if (this.room) this.send({ t: 'roomUpdate', hero: d.hero }); this.render(); break;
       case 'joinCustom': { const ch = (val('chanInput') || '').trim(); if (ch) this.send({ t: 'join', channel: ch }); break; }
-      case 'quick': this.send({ t: 'quick', mode: d.mode }); break;
+      case 'quick': this.send({ t: 'quick', mode: d.mode }); Sound.play('confirm'); break;
+      case 'qmode': this.qmode = d.mode; this.render(); break;
+      case 'chatToggle': this.chatOpen = !this.chatOpen; this.render(); break;
+      case 'heroStep': { const keys = Object.keys(HERO_NAMES), cur = (this.room && (this.room.players.find(p => p.id === this.me.id) || {}).hero) || this.me.hero; const nx = keys[(keys.indexOf(cur) + (+d.d) + keys.length) % keys.length]; this.act('hero', { hero: nx }); return; }
       case 'toggleCreate': this.creating = !this.creating; this.render(); break;
       case 'newMode': this.newMode = d.mode; this.render(); break;
       case 'newStage': this.newStage = +d.i; this.render(); break;
       case 'createRoom': this.creating = false; this.send({ t: 'roomCreate', mode: this.newMode, stage: this.newStage }); break;
       case 'roomStage': this.send({ t: 'roomUpdate', stage: +d.i }); break;
-      case 'challenge': this.send({ t: 'challenge', to: d.id, mode: 'duel', stage: Math.floor(Math.random() * STAGES.length) }); break;
+      case 'challenge': this.send({ t: 'challenge', to: d.id, mode: 'duel', stage: Math.floor(Math.random() * ARENAS.length) }); break;
       case 'friend': this.send({ t: 'friendRequest', to: d.id }); break;
       case 'unfriend': this.send({ t: 'friendRemove', id: d.id }); break;
       case 'accept': this.send({ t: 'friendAccept', from: d.id }); break;

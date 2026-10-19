@@ -133,11 +133,12 @@ function drawTitle(c) {
   c.strokeStyle = 'rgba(212,175,55,0.55)'; c.lineWidth = 2; c.strokeRect(10, 10, W - 20, H - 20);
   c.strokeStyle = 'rgba(212,175,55,0.2)'; c.lineWidth = 1; c.strokeRect(16, 16, W - 32, H - 32);
   if (G.overlay === 'help') drawHelp(c);
-  if (G.overlay === 'stages') drawStageSelect(c);
+  if (G.overlay === 'stages') drawMissionSelect(c);
 }
 
 function drawHelp(c) {
   c.fillStyle = 'rgba(5,3,6,0.8)'; c.fillRect(0, 0, W, H);
+  c.save(); c.translate((W - BASE_W) / 2, 0); const W0 = W; W = BASE_W;
   panel(c, 230, 60, 820, 600, { r: 18 });
   txt(c, 'HOW TO PLAY', W / 2, 118, { font: '900 40px Cinzel, serif', align: 'center', fill: goldGrad(c, 86, 120), stroke: '#120800', sw: 6 });
   const rows = TOUCH ? [
@@ -171,6 +172,7 @@ function drawHelp(c) {
     txt(c, v, 500, y, { font: '600 17px Cinzel, serif', fill: '#efe3c8' });
   });
   txt(c, 'Free players get 3 lives  ·  Royal Pass: 5 lives + unlimited continues', W / 2, 632, { font: '600 15px Cinzel, serif', align: 'center', fill: '#bfae86' });
+  W = W0; c.restore();
 }
 function drawStageSelect(c) {
   c.fillStyle = 'rgba(5,3,6,0.82)'; c.fillRect(0, 0, W, H);
@@ -204,7 +206,7 @@ function drawSelect(c) {
   txt(c, '◆', W / 2, 94, { font: '700 14px serif', align: 'center', fill: '#d4af37' });
   G.rects = [];
   HEROES.forEach((h, i) => {
-    const sel = G.selIdx === i, w = 262, hgt = 470, x = 70 + i * 292, y = 108 - (sel ? 10 : 0);
+    const sel = G.selIdx === i, w = 262, hgt = 470, x = (W - BASE_W) / 2 + 70 + i * 292, y = 108 - (sel ? 10 : 0);
     G.rects.push({ x, y, w, h: hgt, i });
     c.save();
     if (sel) { c.shadowColor = 'rgba(255,190,80,0.55)'; c.shadowBlur = 36; }
@@ -292,8 +294,8 @@ function drawHUD(c) {
   if (wl) txt(c, wl, 442, 101, { font: '600 21px Teko, sans-serif', align: 'right', fill: '#ffe08a' });
   txt(c, String(G.score).padStart(8, '0'), W - 26, 52, { font: '600 44px Teko, sans-serif', align: 'right', fill: goldGrad(c, 18, 52), stroke: '#120800', sw: 5 });
   txt(c, 'HI ' + String(Math.max(Save.d.best, G.score)).padStart(8, '0'), W - 28, 76, { font: '500 20px Teko, sans-serif', align: 'right', fill: '#bfae86' });
-  const st = STAGES[G.stageIdx];
-  txt(c, 'STAGE ' + (G.stageIdx + 1) + '  ·  ' + st.name, W / 2, 32, { font: '700 16px Cinzel, serif', align: 'center', fill: 'rgba(243,220,154,0.95)', stroke: 'rgba(0,0,0,0.7)', sw: 4 });
+  const st = stageDef();
+  txt(c, (G.arena ? '' : 'MISSION ' + (G.stageIdx + 1) + '  ·  ') + st.name, W / 2, 32, { font: '700 16px Cinzel, serif', align: 'center', fill: 'rgba(243,220,154,0.95)', stroke: 'rgba(0,0,0,0.7)', sw: 4 });
   const e = G.focus;
   if (e && G.focusT > 0 && !e.def.boss) {
     c.save(); c.globalAlpha = Math.min(1, G.focusT / 20);
@@ -355,7 +357,7 @@ function drawBanner(c) {
   c.restore();
 }
 function drawIntro(c) {
-  const k = G.sceneT, st = STAGES[G.stageIdx];
+  const k = G.sceneT, st = stageDef();
   const open = Math.min(1, k / 18), close = Math.max(0, (k - 130) / 30);
   const bandH = 190 * open * (1 - close);
   c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(0, 0, W, H);
@@ -363,7 +365,7 @@ function drawIntro(c) {
   c.fillStyle = goldGrad(c, 0, 4); c.fillRect(0, H / 2 - bandH / 2, W, 2); c.fillRect(0, H / 2 + bandH / 2 - 2, W, 2);
   if (bandH < 120) return;
   const slide = Math.max(0, 1 - (k - 10) / 25) * 200;
-  txt(c, 'STAGE ' + (G.stageIdx + 1), W / 2 - slide, H / 2 - 40, { font: '700 22px Cinzel, serif', align: 'center', fill: '#bfae86' });
+  txt(c, 'MISSION ' + (G.stageIdx + 1) + '  ·  ' + CHAPTERS[st.chapter || 0], W / 2 - slide, H / 2 - 40, { font: '700 22px Cinzel, serif', align: 'center', fill: '#bfae86' });
   txt(c, st.name, W / 2 + slide, H / 2 + 18, { font: '900 58px Cinzel, serif', align: 'center', fill: goldGrad(c, H / 2 - 30, H / 2 + 20), stroke: '#120800', sw: 7 });
   txt(c, st.sub, W / 2, H / 2 + 58, { font: '600 18px Cinzel, serif', align: 'center', fill: '#efe3c8' });
 }
@@ -372,7 +374,7 @@ function drawClear(c) {
   c.fillStyle = `rgba(0,0,0,${Math.min(0.55, k / 60)})`; c.fillRect(0, 0, W, H);
   const s = 1 + Math.max(0, 0.5 - k / 30);
   c.save(); c.translate(W / 2, 250); c.scale(s, s);
-  txt(c, 'STAGE CLEAR', 0, 0, { font: '900 84px "Cinzel Decorative", Cinzel, serif', align: 'center', fill: goldGrad(c, -70, 0), stroke: '#120800', sw: 9 });
+  txt(c, 'MISSION COMPLETE', 0, 0, { font: '900 72px "Cinzel Decorative", Cinzel, serif', align: 'center', fill: goldGrad(c, -70, 0), stroke: '#120800', sw: 9 });
   c.restore();
   if (k > 50) {
     panel(c, W / 2 - 260, 300, 520, 180, { r: 14 });
@@ -412,10 +414,10 @@ function drawGameOver(c) {
 }
 function drawPause(c) {
   c.fillStyle = 'rgba(5,3,6,0.7)'; c.fillRect(0, 0, W, H);
-  panel(c, W / 2 - 220, 200, 440, 320, { r: 18 });
+  panel(c, W / 2 - 220, 180, 440, 380, { r: 18 });
   txt(c, 'PAUSED', W / 2, 270, { font: '900 52px Cinzel, serif', align: 'center', fill: goldGrad(c, 230, 272), stroke: '#120800', sw: 7 });
   G.rects = [];
-  ['RESUME', 'RESTART STAGE', 'QUIT TO TITLE'].forEach((l, i) => {
+  ['RESUME', 'SETTINGS', 'RESTART MISSION', 'QUIT TO TITLE'].forEach((l, i) => {
     const y = 340 + i * 54, sel = G.pauseSel === i;
     G.rects.push({ x: W / 2 - 180, y: y - 24, w: 360, h: 48, i });
     if (sel) panel(c, W / 2 - 180, y - 24, 360, 48, { r: 24, top: 'rgba(60,36,12,0.95)', bot: 'rgba(24,14,6,0.95)' });
@@ -465,8 +467,8 @@ function drawEnding(c) {
 
 /* ---------- Cover title (painted poster) ---------- */
 function coverImage(c, t) {
-  const im = SPR.cover, z = 1.04 + Math.sin(t * 0.004) * 0.02;
-  const w = W * z, h = H * z;
+  const im = SPR.cover, z = (1.04 + Math.sin(t * 0.004) * 0.02) * Math.max(W / im.width, H / im.height);
+  const w = im.width * z, h = im.height * z;
   c.drawImage(im, (W - w) / 2, (H - h) / 2 - 6, w, h);
 }
 function drawTitleCover(c) {
@@ -486,20 +488,35 @@ function drawTitleCover(c) {
     txt(c, msg, W / 2, 670, { font: '900 36px Cinzel, serif', align: 'center', fill: goldGrad(c, 638, 674), stroke: '#120800', sw: 6 });
     c.restore();
   } else {
+    // PUBG-style lobby: menu down the left, a big START button bottom-right
     const items = titleItems(); G.rects = [];
-    const gap = 8, bw = Math.min(196, (W - 60 - gap * (items.length - 1)) / items.length), total = items.length * bw + (items.length - 1) * gap, x0 = (W - total) / 2, y = 646;
+    const lx = 34 + SAFE.l, lw = 290, ly = 236, rowH = 56;
     items.forEach((it, i) => {
-      const x = x0 + i * (bw + gap), sel = G.menu === i;
-      G.rects.push({ x, y, w: bw, h: 46, i });
-      panel(c, x, y, bw, 46, sel ? { r: 23, lw: 2.5, top: 'rgba(110,56,16,0.96)', bot: 'rgba(40,18,6,0.96)' } : { r: 23, lw: 1, top: 'rgba(20,10,8,0.82)', bot: 'rgba(8,4,4,0.9)', border: 'rgba(212,175,55,0.45)', noInner: true });
-      txt(c, it.label, x + bw / 2, y + 30, { font: `900 ${sel ? 16 : 14}px Cinzel, serif`, align: 'center', fill: sel ? goldGrad(c, y + 12, y + 34) : (it.lock ? '#8a7a5c' : '#e8dcc0'), stroke: sel ? '#120800' : null, sw: 4 });
+      if (it.id === 'start') return;
+      const y = ly + (i - 1) * rowH, sel = G.menu === i;
+      G.rects.push({ x: lx, y, w: lw, h: 46, i });
+      c.save();
+      c.fillStyle = sel ? 'rgba(245,197,24,0.95)' : 'rgba(10,6,4,0.72)';
+      c.beginPath(); c.moveTo(lx, y); c.lineTo(lx + lw, y); c.lineTo(lx + lw - 14, y + 46); c.lineTo(lx, y + 46); c.closePath(); c.fill();
+      c.strokeStyle = sel ? '#fff1b0' : 'rgba(212,175,55,0.45)'; c.lineWidth = sel ? 2 : 1; c.stroke();
+      c.fillStyle = sel ? '#1a1004' : '#d4af37'; c.fillRect(lx, y, 5, 46);
+      c.restore();
+      txt(c, it.label, lx + 22, y + 30, { font: '900 18px Cinzel, serif', fill: sel ? '#1a1004' : it.lock ? '#8a7a5c' : '#f4ead2' });
     });
-    txt(c, TOUCH ? 'Tap an option' : '\u2190 \u2192 choose  \u00B7  Enter select', W / 2, 628, { font: '600 13px Cinzel, serif', align: 'center', fill: 'rgba(240,220,180,0.75)' });
+    const st = items[0], bw = 400, bh = 104, bx = W - bw - 40 - SAFE.r, by = H - bh - 46, sel0 = G.menu === 0;
+    G.rects.push({ x: bx, y: by, w: bw, h: bh, i: 0 });
+    c.save(); const pulse = 1 + (sel0 ? Math.sin(t * 0.12) * 0.025 : 0); c.translate(bx + bw / 2, by + bh / 2); c.scale(pulse, pulse);
+    bigButton(c, -bw / 2, -bh / 2, bw, bh, '', { dim: false });
+    txt(c, 'START', 0, 6, { font: '900 46px Cinzel, serif', align: 'center', fill: '#1a1004' });
+    txt(c, st.sub, 0, 36, { font: '800 16px Cinzel, serif', align: 'center', fill: 'rgba(26,16,4,0.85)' });
+    if (sel0) { c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.moveTo(-bw / 2 + 16, -bh / 2); c.lineTo(bw / 2, -bh / 2); c.lineTo(bw / 2 - 16, bh / 2); c.lineTo(-bw / 2, bh / 2); c.closePath(); c.stroke(); }
+    c.restore();
+    txt(c, 'LEVEL · ' + DIF().name + '   ·   ' + (Save.d.premium ? '♛ ROYAL' : '3 FREE LIVES'), bx + bw / 2, by - 14, { font: '700 15px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
   }
   txt(c, 'HI-SCORE ' + String(Save.d.best).padStart(7, '0'), W - 28, 40, { font: '600 26px Teko, sans-serif', align: 'right', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
   txt(c, 'Fan-made tribute \u00B7 not affiliated with Capcom', 28, 36, { font: '600 12px Cinzel, serif', fill: 'rgba(240,220,180,0.7)' });
   drawEmbers(c);
   c.strokeStyle = 'rgba(212,175,55,0.55)'; c.lineWidth = 2; c.strokeRect(10, 10, W - 20, H - 20);
   if (G.overlay === 'help') drawHelp(c);
-  if (G.overlay === 'stages') drawStageSelect(c);
+  if (G.overlay === 'stages') drawMissionSelect(c);
 }

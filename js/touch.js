@@ -23,9 +23,9 @@ const Touch = (() => {
   pad.innerHTML = `
     <div class="stick-zone"><div class="stick-base"><div class="stick-knob"></div></div></div>
     <div class="btns">
-      <button class="tb t-spc" data-key="KeyL" aria-label="Special"><b>SPECIAL</b></button>
-      <button class="tb t-jump" data-key="KeyK" aria-label="Jump"><b>JUMP</b></button>
-      <button class="tb t-atk" data-key="KeyJ" aria-label="Attack"><b>ATTACK</b></button>
+      <button class="tb t-spc" data-key="KeyL" aria-label="Special"><i>✸</i><b>SPECIAL</b></button>
+      <button class="tb t-jump" data-key="KeyK" aria-label="Jump"><i>⬆</i><b>JUMP</b></button>
+      <button class="tb t-atk" data-key="KeyJ" aria-label="Attack"><i>⚔</i><b>ATTACK</b></button>
     </div>
     <div class="ctx">
       <button class="cb c-pause" data-tap="KeyP" aria-label="Pause">❚❚</button>
@@ -43,7 +43,7 @@ const Touch = (() => {
     b.addEventListener('pointerdown', e => {
       e.preventDefault(); pid = e.pointerId; capture(b, pid);
       b.classList.add('on'); press(code);
-      if (navigator.vibrate) navigator.vibrate(8);
+      if (navigator.vibrate && (Save.d.vibrate ?? true)) navigator.vibrate(8);
     });
     const up = e => { if (e.pointerId !== pid) return; pid = null; b.classList.remove('on'); release(code); };
     b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
@@ -116,7 +116,7 @@ const Touch = (() => {
   /* ---- show the right controls for the current screen ---- */
   let last = '';
   function sync() {
-    const modal = !!document.querySelector('.modal:not(.hidden)');
+    const modal = !!document.querySelector('.modal:not(.hidden)') || (typeof G !== 'undefined' && !!G.settings);
     const g = typeof G !== 'undefined' ? G : null;
     let mode = 'off';
     if (g && !modal) {
@@ -124,15 +124,21 @@ const Touch = (() => {
       else if (g.scene === 'select' || (g.scene === 'title' && g.overlay === 'stages')) mode = 'select';
     }
     const portrait = innerHeight > innerWidth;
-    const cls = mode + (portrait ? ' portrait' : '') + (g && g.scene === 'select' ? ' sel' : '') + (g && g.arena ? ' arena' : '');
+    const cls = mode + (Save.d.lefty ? ' lefty' : '') + (portrait ? ' portrait' : '') + (g && g.scene === 'select' ? ' sel' : '') + (g && g.arena ? ' arena' : '');
     if (cls !== last) {
       last = cls;
-      pad.className = cls;
+      pad.className = cls; apply();
       if (mode !== 'play') { for (const d in held) setDir(d, false); for (const b of pad.querySelectorAll('.tb.on')) { b.classList.remove('on'); release(b.dataset.key); } }
     }
     requestAnimationFrame(sync);
   }
   requestAnimationFrame(sync);
 
-  return { active: true };
+  function apply() {
+    const k = 0.8 + 0.5 * (Save.d.padSize ?? 0.5), a = 0.35 + 0.65 * (Save.d.padAlpha ?? 0.7);
+    pad.style.setProperty('--pk', k); pad.style.setProperty('--pa', a);
+    pad.classList.toggle('lefty', !!Save.d.lefty);
+  }
+  apply();
+  return { active: true, apply };
 })();

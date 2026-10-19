@@ -18,6 +18,7 @@ const SHEETS = {
   // smooth-animation sheets (0 = detect the number of poses automatically)
   mustafa_c: 0, mustafa_d: 8, rakib_c: 0, rakib_d: 8, nadia_c: 0, nadia_d: 8, bablu_c: 0, bablu_d: 8,
   razor_w: 8, motka_w: 8, poacher_w: 8, biker_w: 8, lash_w: 8, raptor_r: 8,
+  rex_w: 8, trike_w: 8, ptera_f: 8,
 };
 /* Size normalisation: each sheet was painted separately, so the same character can come out
    a few percent bigger or smaller. [baseSheet, base frames, this sheet's frames] are standing
@@ -28,6 +29,7 @@ const NORM = {
   mustafa_d: ['mustafa_a', [0], [0, 1, 2, 3, 4]], rakib_d: ['rakib_a', [0], [0, 1, 2, 3, 4]], nadia_d: ['nadia_a', [0], [0, 1, 2, 3, 4]], bablu_d: ['bablu_a', [0], [0, 1, 2, 3, 4]],
   razor_w: ['razor', [1, 2], [0, 1, 2, 3, 4, 5]], motka_w: ['motka', [1, 2], [0, 1, 2, 3, 4, 5]], poacher_w: ['poacher', [1, 2], [0, 1, 2, 3, 4, 5]],
   biker_w: ['biker', [1, 2], [0, 1, 2, 3, 4, 5]], lash_w: ['lash', [1, 2], [0, 1, 2, 3, 4, 5]], raptor_r: ['raptor', [1, 2], 'all'],
+  rex_w: ['rex', [1, 2], 'all'], trike_w: ['trike', [1, 2], 'all'], ptera_f: ['ptera', [1], [2, 6]],
 };
 
 /* ---------- PNG I/O ---------- */

@@ -22,7 +22,9 @@ six bosses, and **online duels, free-for-alls and team-vs-team battles**.
 
 **Difficulty:** title menu → LEVEL cycles NORMAL / HARD (default) / LEGEND. Villains surround you, sidestep punches, punish whiffed combos and break out of long combos with a COUNTER.
 
-**Story mode:** 6 stages — City in the Sea, Swamp Forest, Hell Road (car chase), Mustafa's Garage, Village of Flame, The Lab.
+**Campaign — Operation Green Valley:** a cinematic prologue, then 12 missions in 4 chapters (The Drowned City, Green Valley, Home Under Siege, The Fang Serum) with briefings, radio chatter and different objectives: clear the area, destroy jammers / serum tanks, free caged dinosaurs, rescue villagers, survive an ambush, defend the Cadillac, beat the clock, the Hell Road car chase and boss hunts. Elite villains (Fang Elite, Iron Motka, Fang Sniper, Alpha Raptor, Fang Captain) and 6 bosses. Progress is saved; MISSIONS replays any unlocked mission.
+
+**Live worlds and music:** parallax backgrounds with moving clouds, water, waterfalls, searchlights and smoke; rain, storms with lightning, fog, embers and fireflies; night / dusk / alarm lighting. Each mission has its own adaptive score that builds up as the fight gets intense, muffles with a heartbeat at low health, and hits big stingers for bosses, objectives and the K.O.
 
 **Online (title menu → ONLINE):**
 - Pick a name and fighter, join a channel (Global, Bangladesh, Asia, …) or create your own.

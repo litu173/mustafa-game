@@ -3,7 +3,8 @@ window.__sim = function (maxFrames) {
   function bot() {
     const p = G.players[0]; if (!p) return;
     Input.keys = {};
-    if (G.scene === 'intro' || G.scene === 'clear') { Input.pressed.Enter = true; return; }
+    if (G.scene === 'intro' || G.scene === 'clear' || G.scene === 'brief' || G.scene === 'story') { if (G.t % 3 === 0) Input.pressed.Enter = true; return; }
+    if (G.scene === 'failed') { window.__fails = (window.__fails || 0) + 1; Input.pressed.Enter = true; return; }
     if (G.scene === 'gameover') { Input.pressed.ArrowDown = true; return; }
     if (G.scene !== 'play') return;
     if (p.hp < 40) p.hp = 100;
@@ -12,13 +13,17 @@ window.__sim = function (maxFrames) {
       if (tgt) { if (Math.abs(tgt.y - p.y) > 10) Input.keys[tgt.y > p.y ? 'KeyS' : 'KeyW'] = true; Input.keys.KeyD = true; if (G.t % 30 === 0) Input.pressed.KeyJ = true; }
       return;
     }
-    const e = G.enemies.filter(e => e.hp > 0 && !e.docile).sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x))[0];
+    const e = G.enemies.filter(e => e.hp > 0 && !e.docile && !e.leaving).sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x))[0];
     if (e) {
       const dx = e.x - p.x, dy = e.y - p.y;
       if (Math.abs(dy) > 10) Input.keys[dy > 0 ? 'KeyS' : 'KeyW'] = true;
       if (Math.abs(dx) > 120) Input.keys[dx > 0 ? 'KeyD' : 'KeyA'] = true;
       else { p.facing = Math.sign(dx) || 1; if (G.t % 6 === 0) Input.pressed.KeyJ = true; if (G.t % 97 === 0) Input.pressed.KeyL = true; if (e.def.flyer && G.t % 40 === 0) Input.pressed.KeyK = true; }
-    } else Input.keys.KeyD = true;
+    } else {
+      const tg = G.props.find(q => q.obj && !q.remove && q.x < G.camX + W);
+      if (tg) { const dx = tg.x - 90 - p.x, dy = tg.y - p.y; if (Math.abs(dy) > 10) Input.keys[dy > 0 ? 'KeyS' : 'KeyW'] = true; if (Math.abs(dx) > 30) Input.keys[dx > 0 ? 'KeyD' : 'KeyA'] = true; else { p.facing = 1; if (G.t % 8 === 0) Input.pressed.KeyJ = true; } }
+      else Input.keys.KeyD = true;
+    }
   }
   const log = [], errs = []; let ls = '', lst = -1, lw = -1, stuck = 0, lastCam = -1;
   try {
