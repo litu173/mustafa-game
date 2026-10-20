@@ -73,7 +73,7 @@ const ENEMY_DEFS = {
     col: '#6f9a3a', stripe: '#34521a', drop: { meat: 0.2 },
   },
   trike: {
-    name: 'TRICERATOPS', hp: 150, speed: 2.2, reach: 120, melee: ['egore'], charge: true, cool: [50, 90], score: 800, dino: 'trike', radius: 46,
+    name: 'TRICERATOPS', hp: 150, speed: 2.2, reach: 150, melee: ['egore'], charge: true, cool: [50, 90], score: 800, dino: 'trike', radius: 60,
     docile: true, col: '#8d906a', drop: { meat: 1 },
   },
   ptera: {
@@ -91,8 +91,8 @@ const ENEMY_DEFS = {
   trooper: { spr: 'poacher', glow: '#3ae0ff', name: 'FANG TROOPER', hp: 84, speed: 3.3, reach: 66, melee: ['epunch', 'ekick'], ranged: 'elaser', keepAway: true, cool: [38, 68], score: 800, weapon: 'rifle', drop: { rifle: 0.3, grenade: 0.15 }, elite: true, cyber: true },
   // ---- bosses ----
   tusker: {
-    name: 'TUSKER', boss: true, hp: 540, speed: 3.8, reach: 150, melee: ['ebite', 'estomp'], charge: true, cool: [35, 70], score: 7000,
-    dino: 'rex', scale: 1.5, radius: 50, col: '#e0892e', stripe: '#8a4210',
+    name: 'TUSKER', boss: true, hp: 540, speed: 3.8, reach: 190, melee: ['ebite', 'estomp'], charge: true, cool: [35, 70], score: 7000,
+    dino: 'rex', scale: 1.5, radius: 64, col: '#e0892e', stripe: '#8a4210',
   },
   butcher: {
     name: 'BUTCHER BHOLA', boss: true, hp: 480, speed: 3.3, reach: 112, melee: ['emachete', 'ecross'], charge: true, cool: [40, 75], score: 6000,

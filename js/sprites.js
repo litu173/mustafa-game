@@ -5,10 +5,12 @@
    Every frame faces right; (ax, ay) is the foot anchor inside the frame.
    The code-drawn art in art.js stays as a fallback while images load.
    ========================================================= */
-const SPRITE_V = 'hd8';   // bump when the art is regenerated, so browsers fetch the new sheets
+const SPRITE_V = 'hd11';   // bump when the art is regenerated, so browsers fetch the new sheets
 const SPR = { img: {}, flash: {}, tint: {}, head: {}, bg: {}, cover: null, loaded: 0, total: 0 };
 
 // sheet names + on-screen height of the reference frame (ref: 0 = stance, 1 = walk)
+// Heights in px at 164 px per metre: heroes ~1.8 m; raptor ~1.3 m; T-rex 600 px ≈ 3.7 m (a young adult —
+// a full-grown 4.6 m rex would not fit the screen); triceratops 390 px ≈ 2.4 m; pteranodon ≈ 1.3 m tall.
 const SPRITE_DEFS = {
   mustafa: { a: 'mustafa_a', b: 'mustafa_b', h: 300, ref: 0 },
   rakib:   { a: 'rakib_a', b: 'rakib_b', h: 302, ref: 0 },
@@ -25,9 +27,9 @@ const SPRITE_DEFS = {
   kaiser:  { a: 'kaiser', h: 332, ref: 1 },
   mutant:  { a: 'mutant', h: 410, ref: 1 },
   raptor:  { a: 'raptor', h: 215, ref: 1 },
-  rex:     { a: 'rex', h: 440, ref: 1 },
-  trike:   { a: 'trike', h: 245, ref: 1 },
-  ptera:   { a: 'ptera', h: 175, ref: 1 },
+  rex:     { a: 'rex', h: 600, ref: 1 },
+  trike:   { a: 'trike', h: 390, ref: 1 },
+  ptera:   { a: 'ptera', h: 215, ref: 1 },
   hog:     { a: 'hog', h: 290, ref: 0 },
 };
 // item atlas order (see the items prompt): food, treasure, guns, melee, props
@@ -157,7 +159,7 @@ function stride(sheet, f, len) {
   const n = window.ATLAS[sheet].length, p = (f.dist || 0) / len * n, i = Math.floor(p), fr = p - i;
   return [sheet, i % n, (i + 1) % n, fr];
 }
-const STRIDE = { hero: 150, run: 175, gang: 150, raptor: 250, rex: 330, trike: 210 };
+const STRIDE = { hero: 150, run: 175, gang: 150, raptor: 250, rex: 450, trike: 335 };   // grows with the bigger dinosaurs so feet do not slide
 // pick a frame from a timeline [[untilFrame, sheet, idx], ...]
 function seq(t, list) { for (const s of list) if (t < s[0]) return [s[1], s[2]]; const l = list[list.length - 1]; return [l[1], l[2]]; }
 function heroFrame(f, A, B, C, D) {
@@ -292,25 +294,54 @@ function spriteFor(f) {
 }
 
 /* ---------- items, props, projectiles, vehicles ---------- */
-function drawItemSpr(c, kind, x, y, k = 0.42) {
+// Real-world length (longest side, metres) of every pickup. Heroes are ~1.83 m = 300 px, so
+// 1 m ≈ 164 px. Tiny things keep a minimum on-screen size so they can still be spotted.
+const PX_PER_M = 164;
+const ITEM_M = { pizza: 0.4, hotdog: 0.24, meat: 0.32, apple: 0.1, gem: 0.15, gold: 0.22, pistol: 0.22, rifle: 1.1, uzi: 0.47,
+  shotgun: 1.0, bazooka: 1.35, grenade: 0.12, knife: 0.3, machete: 0.6, pipe: 0.85, rock: 0.25 };
+function itemScale(kind, minPx = 42) {
+  const fr = window.ATLAS && window.ATLAS.items && window.ATLAS.items[ITEM_IDX[kind]];
+  if (!fr || !ITEM_M[kind]) return 0.42;
+  return Math.max(minPx, ITEM_M[kind] * PX_PER_M) / Math.max(fr.w, fr.h);
+}
+function drawItemSpr(c, kind, x, y, k = itemScale(kind)) {
   if (!spritesReady('items') || ITEM_IDX[kind] === undefined) return false;
   return drawSprite(c, 'items', ITEM_IDX[kind], x, y, 1, k);
 }
+// The '59 Eldorado is 5.7 m long and the heroes about 1.8 m tall, so the car is drawn about three
+// heroes long (CAR_LEN). Seated in an open car you only see head, neck and shoulders above the
+// door: hips sit roughly 0.45 m below the beltline, and the car body hides everything below.
+const CAR_LEN = 910;
+const CAR_SEATS = { driver: { fx: 0.545, fy: 0.58 }, passenger: { fx: 0.385, fy: 0.585 } };
+const CAR_CREW = {};
 function drawCarSpr(c, x, y, damaged, flash, driver, passenger) {
   if (has('car_park')) {
-    const fr = window.ATLAS.car_park[damaged ? 1 : 0], k = 760 / fr.w, left = x - fr.ax * k, top = y - fr.ay * k;
-    // the crew sits in the seats; the car body is drawn over their legs
-    for (const [id, fx] of [[passenger, 0.4], [driver, 0.55]]) {
+    const fr = window.ATLAS.car_park[damaged ? 1 : 0], k = CAR_LEN / fr.w, left = x - fr.ax * k, top = y - fr.ay * k;
+    for (const [id, seat] of [[passenger, 'passenger'], [driver, 'driver']]) {
       if (!id) continue;
-      const sh = id + '_a'; if (!spritesReady(sh)) continue;
-      const hf = window.ATLAS[sh][0], hk = (fr.h * k * 0.95) / hf.h;
-      drawSprite(c, sh, 0, left + fr.w * k * fx, top + fr.h * k * 0.92, 1, hk, { flash });
+      const sx = left + fr.w * k * CAR_SEATS[seat].fx, sy = top + fr.h * k * CAR_SEATS[seat].fy;
+      if (typeof hasRig === 'function' && hasRig(id)) {
+        const f = CAR_CREW[seat + id] || (CAR_CREW[seat + id] = { def: HEROES.find(h => h.id === id) || { id }, id: seat === 'driver' ? 1 : 2, state: 'sit', seat, t: 0 });
+        f.t++;
+        // keep legs hidden even where the painted door is low: only draw above the car floor
+        c.save(); c.beginPath(); c.rect(sx - 200, top - 400, 400, fr.h * k * 0.74 + 400); c.clip();
+        drawRig(c, f, sx, sy, 1, { flash, seat: true });
+        c.restore();
+      } else {
+        // whole-body painting at its normal in-game size, lowered until the hips (about half the
+        // figure's height above the boots) rest on the seat; the car body hides everything below
+        const sh = id + '_a', d = SPRITE_DEFS[id]; if (!spritesReady(sh) || !d) continue;
+        const sway = Math.sin(G.t * 0.09 + (seat === 'driver' ? 0 : 1.7)) * 1.2;
+        c.save(); c.beginPath(); c.rect(sx - 200, top - 400, 400, fr.h * k * 0.74 + 400); c.clip();
+        drawSprite(c, sh, 0, sx, sy + d.h * 0.5 + sway, 1, spriteScale(id), { flash });
+        c.restore();
+      }
     }
     return drawSprite(c, 'car_park', damaged ? 1 : 0, x, y, 1, k, { flash });
   }
   if (!spritesReady('car')) return false;
   const fr = window.ATLAS.car[0];
-  return drawSprite(c, 'car', damaged ? 1 : 0, x, y, 1, 760 / fr.w, { flash });
+  return drawSprite(c, 'car', damaged ? 1 : 0, x, y, 1, CAR_LEN / fr.w, { flash });
 }
 // painted HD portraits (assets/portraits.jpg, 320px cells), used everywhere a face is shown
 const PORT_IDX = { mustafa: 0, rakib: 1, nadia: 2, bablu: 3, kaiser: 4, mutant: 4, butcher: 5, saju: 6, morgol: 7, captain: 8, razor: 8, hakim: 9 };

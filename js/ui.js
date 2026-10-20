@@ -164,7 +164,7 @@ function drawSelect(c) {
     const k = G.selK[i], w = 262, hgt = 470, x = (W - BASE_W) / 2 + 70 + i * 292, y = 108 - 16 * k;
     G.rects.push({ x, y: 108, w, h: hgt, i });
     c.save();
-    c.translate(x + w / 2, y + hgt / 2); c.scale(1 + 0.04 * k, 1 + 0.04 * k); c.translate(-(x + w / 2), -(y + hgt / 2));
+    c.translate(x + w / 2, y + hgt / 2); c.scale(1 + 0.06 * k, 1 + 0.06 * k); c.translate(-(x + w / 2), -(y + hgt / 2));
     c.save();
     if (k > 0.05) { c.shadowColor = `rgba(255,190,80,${0.6 * k})`; c.shadowBlur = 40 * k; }
     rrect(c, x, y, w, hgt, 16);
@@ -184,11 +184,17 @@ function drawSelect(c) {
     // the hero is drawn unclipped and sized to fit, so raised fists are never cut off;
     // a freshly selected hero raises a fist, then eases back into the stance
     const pt = sel ? G.selPoseT : 999, win = pt < 12 ? pt / 12 : pt < 60 ? 1 : pt < 76 ? 1 - (pt - 60) / 16 : 0;
-    const fit = (sheet, idx) => { const fr = window.ATLAS[sheet][idx]; return Math.min(spriteScale(h.id) * 1.05, (fy - y - 18) / fr.ay); };
+    // every card shows its fighter at the same size (Roy only a touch taller), so no card looks
+    // "hovered" except the one that is: that one grows via the card zoom above
+    const cardH = Math.min(sd.h, 312) / sd.h;
+    const fit = (sheet, idx) => { const fr = window.ATLAS[sheet][idx]; return Math.min(spriteScale(h.id) * cardH * 1.05, (fy - y - 40) / fr.ay); };
     const breathe = 1 + Math.sin(t * 0.08 + i) * 0.012, bob = Math.sin(t * 0.05 + i) * 2 * k;
     if (spritesReady(sd.a) && spritesReady(sd.b)) {
-      if (win < 1) { c.save(); c.globalAlpha *= 1 - win; drawSprite(c, sd.a, 0, x + w / 2, fy + bob, 1, fit(sd.a, 0), { sy: breathe }); c.restore(); }
-      if (win > 0) { c.save(); c.globalAlpha *= win; drawSprite(c, sd.b, 7, x + w / 2, fy + bob, 1, fit(sd.b, 7), { sy: breathe }); c.restore(); }
+      if (typeof hasRig === 'function' && hasRig(h.id)) drawHeroFigure(c, h, x + w / 2, fy + bob, 1, fit(sd.a, 0) / spriteScale(h.id), win > 0.5 ? 'win' : 'idle');
+      else {
+        if (win < 1) { c.save(); c.globalAlpha *= 1 - win; drawSprite(c, sd.a, 0, x + w / 2, fy + bob, 1, fit(sd.a, 0), { sy: breathe }); c.restore(); }
+        if (win > 0) { c.save(); c.globalAlpha *= win; drawSprite(c, sd.b, 7, x + w / 2, fy + bob, 1, fit(sd.b, 7), { sy: breathe }); c.restore(); }
+      }
     } else drawFigure(c, look, poseFor(i, 'idle', t, i === 0 ? { weapon: 'rifle' } : null), x + w / 2 - 6, fy, 1, 1.72 * (h.look.scale || 1), { t, weapon: i === 0 ? 'rifle' : null });
     if (k < 0.99) { c.fillStyle = `rgba(5,3,4,${0.45 * (1 - k)})`; rrect(c, x, y, w, hgt, 16); c.fill(); }
     c.lineWidth = sel ? 3 : 1.5; c.strokeStyle = sel ? goldGrad(c, y, y + hgt) : 'rgba(212,175,55,0.35)'; rrect(c, x, y, w, hgt, 16); c.stroke();

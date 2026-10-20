@@ -726,20 +726,20 @@ function updateDrive() {
     if (p.boostT > 0) p.boostT--;
     if (Input.hit('atk') && p.boostCool <= 0) { p.boostT = 20; p.boostCool = 55; Sound.play('whoosh'); }
     p.x += d.speed + ix * 7 + (p.boostT > 0 ? 9 : 0); p.y += iy * 5;
-    p.x = clamp(p.x, G.camX + 390, G.camX + W - 430); p.y = clamp(p.y, 520, 690);
+    p.x = clamp(p.x, G.camX + 470, G.camX + W - 500);   // the 910 px Cadillac stays on screen p.y = clamp(p.y, 520, 690);
     p.walkPh += 0.5;
-    if (G.t % 3 === 0) addPart({ type: 'dust', x: p.x - 360, y: p.y, z: 8, vx: -3, vz: 0.6, life: 26, size: 20, color: 'rgba(220,190,150,' });
+    if (G.t % 3 === 0) addPart({ type: 'dust', x: p.x - 430, y: p.y, z: 8, vx: -3, vz: 0.6, life: 26, size: 20, color: 'rgba(220,190,150,' });
     // run over anything in front of the bumper
     for (const e of G.enemies) {
       if (e.def.rider || !e.canBeHit) continue;
       const rel = e.x - p.x;
-      if (rel > -380 && rel < 420 && Math.abs(e.y - p.y) < 44 && e.z < 60) {
+      if (rel > -455 && rel < 475 && Math.abs(e.y - p.y) < 44 && e.z < 60) {
         damage(e, p, 34, { down: true, kbx: 13, kbz: 13, dir: 1, shake: 10 });
         Sound.play('crash'); addScore(300);
       }
     }
     for (const pr of G.props) {
-      if (!pr.remove && pr.x - p.x > -380 && pr.x - p.x < 420 && Math.abs(pr.y - p.y) < 44) { hitProp(pr); hitProp(pr); Sound.play('crash'); }
+      if (!pr.remove && pr.x - p.x > -455 && pr.x - p.x < 475 && Math.abs(pr.y - p.y) < 44) { hitProp(pr); hitProp(pr); Sound.play('crash'); }
     }
   }
   // traffic: gang runners, rock throwers, barrels and food on the road
@@ -1234,7 +1234,7 @@ function drawFighter(f) {
     const bounce = Math.sin(G.t * 0.6) * 1.5 + (f.state === 'dead' ? 6 : 0);
     const pas = HEROES[(G.selIdx + 1) % HEROES.length];
     if (!drawCarSpr(ctx, sx, f.y + bounce, f.state === 'dead' || f.hp < f.maxHp * 0.35, flash, f.def.id, typeof allyId === 'function' ? allyId() : null)) drawCar(ctx, sx, f.y, 1.55, { t: G.t, bounce, driver: flash ? whiteLook(f.look) : f.look, passenger: pas.look, driverPose: RIDE_POSE, col: f.royal ? '#151515' : '#c0262e' });
-    if (f.boostT > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, sx - 380, f.y - 60, 90, 'rgba(255,160,60,0.7)'); ctx.restore(); }
+    if (f.boostT > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, sx - 455, f.y - 60, 90, 'rgba(255,160,60,0.7)'); ctx.restore(); }
     ctx.restore(); return;
   }
   const spr = spriteFor(f);
@@ -1470,12 +1470,16 @@ function drawHover(c) {
   const m = Input.mouse, R = !TOUCH && m.x >= 0 && !Input.locked ? uiHit(m.x, m.y) : null;
   const cur = R ? 'pointer' : 'default';
   if (cur !== lastCursor) { cvs.style.cursor = cur; lastCursor = cur; }
-  if (!R || typeof R.i === 'number') return;   // list items already light up when hovered
+  if (!R || typeof R.i === 'number' || R.big) return;   // list items and gold buttons light up on their own
   c.save();
-  c.shadowColor = 'rgba(255,214,90,0.9)'; c.shadowBlur = 18 + Math.sin(G.t * 0.15) * 6;
-  c.strokeStyle = 'rgba(255,230,150,0.85)'; c.lineWidth = 2.5;
-  if (Math.abs(R.w - R.h) < 4) { c.beginPath(); c.arc(R.x + R.w / 2, R.y + R.h / 2, R.w / 2 - 4, 0, TAU); c.stroke(); }
-  else { rrect(c, R.x - 3, R.y - 3, R.w + 6, R.h + 6, Math.min(28, R.h / 2 + 3)); c.stroke(); }
+  if (Math.abs(R.w - R.h) < 4) {   // round ✕ buttons: a glowing ring
+    c.shadowColor = 'rgba(255,214,90,0.9)'; c.shadowBlur = 18 + Math.sin(G.t * 0.15) * 6;
+    c.strokeStyle = 'rgba(255,230,150,0.85)'; c.lineWidth = 2.5;
+    c.beginPath(); c.arc(R.x + R.w / 2, R.y + R.h / 2, R.w / 2 - 4, 0, TAU); c.stroke();
+  } else {                          // pill buttons: brighten inside their own shape, no extra outline
+    c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(255,214,120,0.16)';
+    rrect(c, R.x, R.y, R.w, R.h, Math.min(28, R.h / 2)); c.fill();
+  }
   c.restore();
 }
 

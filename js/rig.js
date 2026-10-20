@@ -8,6 +8,7 @@
    ========================================================= */
 const RIGIMG = {}, RIGFLASH = {};
 function loadRigs() {
+  if (!HERO_RIG) return;
   for (const id of Object.keys(window.RIG || {})) {
     const im = new Image(); SPR.total++;
     im.onload = () => { RIGIMG[id] = im; RIGFLASH[id] = tinted(im, '#fff6e0', 1); SPR.loaded++; };
@@ -15,10 +16,15 @@ function loadRigs() {
     im.src = 'assets/sprites/rig_' + id + '.webp?v=' + SPRITE_V;
   }
 }
-const hasRig = id => !!RIGIMG[id] && !!(window.RIG && window.RIG[id]);
+// Off: the heroes are drawn as single whole-body paintings (head to boots in one piece), like
+// every other character, so the neck and body always match. The cut-out puppet is kept for reference.
+const HERO_RIG = false;
+const hasRig = id => HERO_RIG && !!RIGIMG[id] && !!(window.RIG && window.RIG[id]);
 
 // a few hand-tuned numbers per hero (head size and seat of the head on the neck)
-const RIG_TUNE = { mustafa: { head: 0.95, neckDy: 6 }, rakib: { head: 0.95, neckDy: 6 }, nadia: { head: 0.92, neckDy: 4 }, bablu: { head: 0.9, neckDy: 8 } };
+// head size and neck seat tuned by .claude/proportions.js against the cover painting
+
+const RIG_TUNE = { mustafa: { head: 1.023, neckDy: 13.6 }, rakib: { head: 1.085, neckDy: 27.6 }, nadia: { head: 1.099, neckDy: 88.4 }, bablu: { head: 1.014, neckDy: 54.1 } };   // matched to the cover: chin-to-hip ≈ 2.1 heads, neck ≈ 0.2 head
 
 const PK = ['lean', 'head', 'uF', 'fF', 'uB', 'fB', 'tF', 'sF', 'tB', 'sB', 'rot', 'lift'];
 const GUARD = { lean: 0.03, head: 0, uF: -0.55, fF: -1.95, uB: -0.3, fB: -2.0, tF: -0.14, sF: 0.2, tB: 0.2, sB: 0.12, rot: 0, lift: 0 };
@@ -60,6 +66,14 @@ function rigTarget(f) {
     case 'fall': Object.assign(P, { rot: Math.min(1.45, f.t * 0.12), head: 0.3, uF: -2.2, fF: -0.4, uB: -2.6, fB: -0.3, tF: -0.6, sF: 0.6, tB: -0.2, sB: 0.4 }); break;
     case 'down': case 'dead': Object.assign(P, { rot: 1.5, head: 0.1, uF: -2.9, fF: -0.2, uB: -2.7, fB: -0.2, tF: -0.15, sF: 0.1, tB: 0.05, sB: 0.1, lift: 0 }); break;
     case 'getup': { const k = ease(Math.min(1, f.t / 18)); Object.assign(P, { rot: mix(1.5, 0, k), tF: mix(-0.15, -1.3, Math.sin(k * Math.PI)), sF: mix(0.1, 2.2, Math.sin(k * Math.PI)), uF: mix(-2.9, -0.55, k) }); break; }
+    // seated in the Cadillac: thighs level, shins down, back against the seat. A driver keeps
+    // both hands up on the wheel; a passenger rests the near arm on the door.
+    case 'sit': case 'drive':
+      Object.assign(P, { lean: -0.12, head: 0.06, tF: -1.5, sF: 1.45, tB: -1.42, sB: 1.4 });
+      if (f.seat === 'driver') Object.assign(P, { uF: -0.95, fF: -0.55, uB: -0.85, fB: -0.65 });
+      else Object.assign(P, { uF: -0.35, fF: -1.35, uB: -0.2, fB: -1.5, head: -0.04 });
+      P.lean += Math.sin(t * 0.09) * 0.015;   // a little road sway
+      break;
     case 'win': Object.assign(P, { uF: -3.0, fF: -0.1, uB: -0.25, fB: -0.6, lean: -0.06, head: -0.12 }); break;
     case 'grab': Object.assign(P, { uF: -1.25, fF: -0.35, uB: -1.0, fB: -0.5, lean: -0.08, tF: -0.3, sF: 0.35 }); break;
     case 'attack': {
@@ -112,7 +126,8 @@ function drawRig(c, f, x, y, face, o = {}) {
   const sF = shoulder('shF'), sB = shoulder('shB');
   const elF = limb('upperF', sF, P.uF), elB = limb('upperB', sB, P.uB);
   // stand on the lower foot (both feet stay planted as the hip rises and falls)
-  const ground = Math.max(footF[1], footB[1]) + 4;
+  // o.seat: hips are pinned at (x, y) instead (sitting in the car)
+  const ground = o.seat ? 0 : Math.max(footF[1], footB[1]) + 4;
   c.save();
   c.translate(x, y - (P.rot > 0.05 ? 30 * Math.min(1, P.rot) : 0));
   c.scale((P.flip ? -face : face) * k, k);
@@ -128,25 +143,30 @@ function drawRig(c, f, x, y, face, o = {}) {
   // back limbs, torso, front leg, head, front arm
   draw('upperB', sB, P.uB); draw('foreB', elB, P.uB + P.fB);
   draw('thighB', hipB, P.tB); draw('shinB', kneeB, P.tB + P.sB);
-  // the painted side heads carry a full neck: draw them before the torso so the shirt collar
-  // overlaps the base of the neck; the older cover cut-outs sit on top instead
+  // the painted side heads carry a full neck that fades out over the torso's own neck
   const side = R.head && R.head.j.chin;
   const drawHead = () => {
     const hd = R.head, hs = side ? (torsoLen * 0.5) / hd.j.chin[1] * tune.head : (torsoLen * 0.62) / hd.h * tune.head;
     c.save(); c.translate(neck[0], neck[1] + (side ? tune.neckDy * 0.5 : tune.neckDy)); c.rotate(P.lean * 0.5 + P.head); c.scale(hs, hs);
     c.drawImage(img, hd.x, hd.y, hd.w, hd.h, -hd.j.neck[0], -hd.j.neck[1], hd.w, hd.h);
+    if (o.dbg) {   // measurement hook for tests: crown, chin, neck seat, collar and belt in canvas pixels
+      const M = c.getTransform(), pt = (px, py) => { const q = M.transformPoint(new DOMPoint(px, py)); return [q.x, q.y]; };
+      o.dbg.crown = pt(0, -hd.j.neck[1]);
+      { const hsInv = 1 / hs, r = -(P.lean * 0.5 + P.head);   // collar (torso neck joint) and hip, from the head's frame
+        const back = (px, py) => { const dx = px - neck[0], dy = py - (neck[1] + (side ? tune.neckDy * 0.5 : tune.neckDy)); return [(dx * Math.cos(r) - dy * Math.sin(r)) * hsInv, (dx * Math.sin(r) + dy * Math.cos(r)) * hsInv]; };
+        const cl = back(neck[0], neck[1]), hp = back(0, 0); o.dbg.collar = pt(cl[0], cl[1]); o.dbg.hip = pt(hp[0], hp[1]); } o.dbg.chin = pt(0, (side ? hd.j.chin[1] : hd.h * 0.8) - hd.j.neck[1]); o.dbg.neck = pt(0, 0);
+    }
     c.restore();
   };
-  if (side) drawHead();
   draw('torso', [0, 0], P.lean, tor.j.hip);
   draw('thighF', hipF, P.tF); draw('shinF', kneeF, P.tF + P.sF);
-  if (R.head && !side) drawHead();
+  if (R.head) drawHead();
   draw('upperF', sF, P.uF); draw('foreF', elF, P.uF + P.fF);
   // a held weapon sits in the front fist
   if (f.weapon && typeof drawItemSpr === 'function' && (GUNS[f.weapon] || MELEE_W[f.weapon])) {
     const fist = limb('foreF', elF, P.uF + P.fF);
     c.save(); c.translate(fist[0], fist[1]); c.rotate(P.uF + P.fF + Math.PI / 2); c.scale(1 / k, 1 / k);
-    drawItemSpr(c, f.weapon, 0, 18, 0.4); c.restore();
+    drawItemSpr(c, f.weapon, 0, 18, itemScale(f.weapon, 26)); c.restore();   // true-to-life size in the fist
   }
   c.restore();
   return true;

@@ -40,14 +40,24 @@ function neckColumn(img) {
   let best = null;
   for (let y = Math.floor(img.h * 0.7); y < img.h * 0.82; y++) { const [a, b] = run(y); if (a >= 0 && (!best || b - a < best[1] - best[0])) best = [a, b, y]; }
   if (!best) return;
-  const [nx0, nx1, ny] = best, pad = (nx1 - nx0) * 0.04, f0 = img.h * 0.84, f1 = img.h * 0.9;
+  // chin: on a head facing right, the right edge jumps inward where the jaw meets the neck
+  const right = y => { for (let x = img.w - 1; x >= 0; x--) if (A(x, y) > 128) return x; return -1; };
+  let chin = img.h * 0.66, jump = 0;
+  for (let y = Math.floor(img.h * 0.5); y < best[2]; y++) { const d = right(y - 4) - right(y + 4); if (d > jump) { jump = d; chin = y; } }
+  img.chinY = chin; img.neckY = best[2];
+  // below the narrowest row the neck keeps that width (soft 6% edges), then melts away over
+  // the next 14% of the height, where it lies on top of the torso's own neck
+  const [nx0, nx1, ny] = best, nw = nx1 - nx0, soft = Math.max(4, nw * 0.06), f0 = ny + nw * 0.25, f1 = f0 + img.h * 0.14;
   for (let y = ny; y < img.h; y++) for (let x = 0; x < img.w; x++) {
-    const i = (y * img.w + x) * 4;
-    let k = x < nx0 - pad || x > nx1 + pad ? 0 : 1;
+    const i = (y * img.w + x) * 4, e = Math.min(x - nx0, nx1 - x);   // distance inside the column
+    let k = Math.max(0, Math.min(1, (e + soft * 0.3) / soft));
     if (y > f0) k *= Math.max(0, 1 - (y - f0) / (f1 - f0));
     img.data[i + 3] = Math.round(img.data[i + 3] * k);
   }
+  img.fadeY = (f0 + f1) / 2;
 }
+// first row with any opaque pixel (trim() removes the rows above it)
+const firstRow = img => { for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) if (img.data[(y * img.w + x) * 4 + 3] > 8) return y; return 0; };
 // trim fully transparent borders
 const trim = img => {
   let x0 = img.w, y0 = img.h, x1 = -1, y1 = -1;
@@ -83,7 +93,8 @@ for (const file of fs.readdirSync(RAW).filter(f => f.endsWith('_parts.png'))) {
     const h = readPNG(sideFile); keyMagenta(h); despill(h);
     const { comps: hc } = components(h), c = hc.sort((a, b) => b.n - a.n)[0];
     const hd = shrink(trim(crop(h, c.x0, c.y0, c.x1, c.y1)), 420);
-    neckColumn(hd); parts.head = trim(hd); parts.head.side = true;
+    neckColumn(hd); const top = firstRow(hd);
+    parts.head = trim(hd); parts.head.side = true; parts.head.chinY = hd.chinY - top; parts.head.neckY = hd.neckY - top; parts.head.fadeY = hd.fadeY - top;
   } else if (fs.existsSync(headFile)) parts.head = trim(readPNG(headFile));
 
   // joints, in each part's own pixels
@@ -91,7 +102,7 @@ for (const file of fs.readdirSync(RAW).filter(f => f.endsWith('_parts.png'))) {
   for (const [n, p] of Object.entries(parts)) {
     if (n === 'torso') J[n] = { hip: [bandCenter(p, 0.86, 0.92), p.h * 0.89], neck: [bandCenter(p, 0, 0.04), p.h * 0.02], shF: [p.w * 0.32, p.h * 0.2], shB: [p.w * 0.66, p.h * 0.16] };
     else if (n === 'head') J[n] = p.side
-      ? { neck: [bandCenter(p, 0.8, 0.86), p.h * 0.88], chin: [0, p.h * 0.66] }   // neck base sits inside the collar
+      ? { neck: [bandCenter(p, p.neckY / p.h, p.neckY / p.h + 0.04), Math.min(p.h, p.fadeY)], chin: [0, p.chinY] }   // seat = middle of the fade   // neck base sits inside the collar
       : { neck: [bandCenter(p, 0.9, 0.97), p.h * 0.93] };
     else if (n.startsWith('upper')) J[n] = { top: [bandCenter(p, 0.06, 0.16), p.h * 0.14], end: [bandCenter(p, 0.84, 0.92), p.h * 0.88] };
     else if (n.startsWith('fore')) J[n] = { top: [bandCenter(p, 0.04, 0.12), p.h * 0.08], end: [bandCenter(p, 0.8, 0.9), p.h * 0.86] };

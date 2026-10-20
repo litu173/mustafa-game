@@ -865,7 +865,7 @@ function drawBike(c, x, y, s, o = {}) {
 
 /* ---------------- items, props, projectiles ---------------- */
 function drawItemSprite(c, kind, x, y, t) {
-  if (drawItemSpr(c, kind, x, y, WEAPONS.includes(kind) ? 0.46 : 0.42)) { itemGlint(c, x, y, t); return; }
+  if (drawItemSpr(c, kind, x, y, itemScale(kind))) { itemGlint(c, x, y, t); return; }
   c.save(); c.translate(x, y); c.scale(CS * 0.75, CS * 0.75); c.lineJoin = 'round'; c.strokeStyle = OUT; c.lineWidth = 2;
   const P = () => new Path2D();
   switch (kind) {

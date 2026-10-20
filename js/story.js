@@ -95,7 +95,7 @@ const Mission = {
     }
     if (w.defend) {
       m.car = { x: w.at + W / 2 - 60, y: 600, hp: w.defend, max: w.defend, flash: 0 };
-      G.props.forEach(p => { if (Math.abs(p.x - m.car.x) < 240) p.x = m.car.x - 420; });
+      G.props.forEach(p => { if (Math.abs(p.x - m.car.x) < 330) p.x = m.car.x - 520; });
     }
   },
   // runs every frame while playing a campaign mission
@@ -125,9 +125,9 @@ const Mission = {
     if (car && !car.safe) {
       if (car.flash > 0) car.flash--;
       for (const e of G.enemies) {
-        if (e.vsCar && e.state === 'attack' && e.move && e.t === (e.move.a0 || 10) && Math.abs(e.x - car.x) < 260 && Math.abs(e.y - car.y) < 90) {
+        if (e.vsCar && e.state === 'attack' && e.move && e.t === (e.move.a0 || 10) && Math.abs(e.x - car.x) < 360 && Math.abs(e.y - car.y) < 90) {
           car.hp -= Math.round((e.move.dmg || 8) * DIF().dmg); car.flash = 8;
-          sparks(car.x + rand(-120, 120), car.y, 90, true); Sound.play('crash');
+          sparks(car.x + rand(-200, 200), car.y, 90, true); Sound.play('crash');
           if (car.hp <= 0) return this.fail('They wrecked the Cadillac.');
         }
       }
@@ -330,16 +330,32 @@ function drawBrief(c) {
   c.restore();
   // hero + buttons
   const h = HEROES[G.selIdx];
-  if (spritesReady(h.id + '_a')) drawSprite(c, h.id + '_a', 0, W - 300, 610, -1, spriteScale(h.id) * 1.25);
-  G.rects = [{ x: W - 400, y: H - 132, w: 340, h: 82, i: 'go' }, { x: 30, y: 22, w: 140, h: 44, i: 'back' }];
-  const pulse = 1 + Math.sin(G.t * 0.12) * 0.02;
-  c.save(); c.translate(W - 230, H - 91); c.scale(pulse, pulse);
+  drawHeroFigure(c, h, W - 300, 610, -1, 1.25, 'idle');
+  G.rects = [{ x: W - 400, y: H - 132, w: 340, h: 82, i: 'go', big: true }, { x: 30, y: 22, w: 140, h: 44, i: 'back' }];
+  const m = Input.mouse, over = !TOUCH && m.x >= W - 400 && m.x <= W - 60 && m.y >= H - 132 && m.y <= H - 50;
+  G.goHover = (G.goHover || 0) + ((over ? 1 : 0) - (G.goHover || 0)) * 0.25;
+  const pulse = 1 + Math.sin(G.t * 0.12) * 0.02 + G.goHover * 0.05;
+  c.save(); c.translate(W - 230, H - 91 - G.goHover * 3); c.scale(pulse, pulse);
+  if (G.goHover > 0.02) c.filter = `brightness(${1 + G.goHover * 0.18})`;
   bigButton(c, -170, -41, 340, 82, 'DEPLOY  ▶');
   c.restore();
   panel(c, 30, 22, 140, 44, { r: 22, noInner: true, top: 'rgba(20,12,6,0.85)', bot: 'rgba(10,6,4,0.85)', border: 'rgba(212,175,55,0.6)' });
   txt(c, '◀  BACK', 100, 51, { font: '700 17px Cinzel, serif', align: 'center', fill: '#f3dc9a' });
 }
 // PUBG-style primary button: bright yellow, dark bold text
+// A hero drawn the same way as in the fight (the cover-faced puppet), falling back to the old sheet
+function drawHeroFigure(c, h, x, y, face, scale, state) {
+  if (typeof hasRig === 'function' && hasRig(h.id)) {
+    const f = drawHeroFigure.cache[h.id] || (drawHeroFigure.cache[h.id] = { def: h, id: HEROES.indexOf(h), t: 0, vx: 0, z: 0 });
+    if (f.state !== state) { f.state = state; f.t = 0; } f.t++;
+    c.save(); c.translate(x, y); c.scale(scale, scale); drawRig(c, f, 0, 0, face, {}); c.restore();
+    return true;
+  }
+  if (!spritesReady(h.id + '_a')) return false;
+  drawSprite(c, h.id + '_a', 0, x, y, face, spriteScale(h.id) * scale);
+  return true;
+}
+drawHeroFigure.cache = {};
 // Gold action button. It is always fully lit (a dull button reads as "disabled");
 // the keyboard/controller focus shows as a pulsing glow and a bright outline instead.
 function bigButton(c, x, y, w, h, label, o = {}) {
@@ -579,7 +595,7 @@ function drawObjProp(c, pr, x, y) {
 }
 function drawParkedCar(c, car) {
   const x = car.x - G.camX, fl = car.flash > 0 && car.flash % 2, dmgd = car.hp < car.max * 0.4;
-  if (has('car_park')) { const fr = window.ATLAS.car_park[dmgd ? 1 : 0]; drawSprite(c, 'car_park', dmgd ? 1 : 0, x, car.y, 1, 640 / fr.w, { flash: fl }); }
+  if (has('car_park')) { const fr = window.ATLAS.car_park[dmgd ? 1 : 0]; drawSprite(c, 'car_park', dmgd ? 1 : 0, x, car.y, 1, CAR_LEN / fr.w, { flash: fl }); }   // same real-world size as the driven car
   else drawCar(c, x, car.y, 1.55, { t: 0, col: '#c0262e' });
 }
 function drawMissionWorld(c) {
