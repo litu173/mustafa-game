@@ -3,21 +3,22 @@
    MUSTAFA — screens: cover/title, hero select, HUD, overlays,
    the gun-to-your-face continue screen and the ending.
    ========================================================= */
-let LOGO = null, SHINE = null;
 // The MUSTAFA REBORN logo (painted art in assets/logo.png), drawn by width with a light sweep across it.
+const LOGO_SHINE = new Map();   // one light-sweep buffer per logo size
 function drawLogo(c, cx, cy, width) {
-  if (SPR.logo && LOGO !== SPR.logo) {
-    LOGO = SPR.logo; SHINE = document.createElement('canvas'); SHINE.width = LOGO.width; SHINE.height = LOGO.height;
-  }
+  // pick the smallest logo file that stays sharp at this size on this screen
+  const px = width * VIEW.k, LOGO = (px <= 470 && SPR.logoSm) || SPR.logo || SPR.logoSm;
   if (!LOGO) return;
+  let SHINE = LOGO_SHINE.get(LOGO);
+  if (!SHINE) { SHINE = document.createElement('canvas'); SHINE.width = LOGO.width; SHINE.height = LOGO.height; LOGO_SHINE.set(LOGO, SHINE); }
   const scale = width / LOGO.width;
   const sc = SHINE.getContext('2d');
   sc.globalCompositeOperation = 'source-over'; sc.clearRect(0, 0, SHINE.width, SHINE.height); sc.drawImage(LOGO, 0, 0);
   sc.globalCompositeOperation = 'source-atop';
-  const px = ((G.t * 7) % (SHINE.width * 2.4)) - SHINE.width * 0.35;
-  const g = sc.createLinearGradient(px - 90, 0, px + 90, 0);
+  const sw = SHINE.width / 1100, sx = ((G.t * 7 * sw) % (SHINE.width * 2.4)) - SHINE.width * 0.35, band = 90 * sw;
+  const g = sc.createLinearGradient(sx - band, 0, sx + band, 0);
   g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,240,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-  sc.save(); sc.transform(1, 0, -0.4, 1, 0, 0); sc.fillStyle = g; sc.fillRect(px - 90, 0, 180 + SHINE.height, SHINE.height); sc.restore();
+  sc.save(); sc.transform(1, 0, -0.4, 1, 0, 0); sc.fillStyle = g; sc.fillRect(sx - band, 0, band * 2 + SHINE.height, SHINE.height); sc.restore();
   const w = LOGO.width * scale, h = LOGO.height * scale;
   c.save(); c.globalCompositeOperation = 'lighter'; glow(c, cx, cy, w * 0.5, 'rgba(255,110,40,0.18)'); c.restore();
   c.drawImage(SHINE, cx - w / 2, cy - h / 2, w, h);
@@ -67,8 +68,12 @@ function drawLoader(c, alpha) {
   }
   c.restore();
   updateTitleFx(); drawEmbers(c);
-  if (SPR.logo) drawLogo(c, W / 2, H * 0.4, Math.min(620, W * 0.5));
-  else txt(c, 'MUSTAFA REBORN', W / 2, H * 0.42, { font: '600 64px Teko, sans-serif', align: 'center', fill: '#f5c518' });
+  if (SPR.logo || SPR.logoSm) { c.save(); c.globalAlpha *= Math.min(1, (G.t - (G.logoT ??= G.t)) / 20); drawLogo(c, W / 2, H * 0.4, Math.min(620, W * 0.5)); c.restore(); }
+  else {   // logo still on its way: just a spinning ring, no stand-in text
+    c.save(); c.translate(W / 2, H * 0.4); c.rotate(t * 0.08);
+    c.strokeStyle = 'rgba(245,197,24,0.9)'; c.lineWidth = 6; c.lineCap = 'round'; c.beginPath(); c.arc(0, 0, 40, 0, Math.PI * 1.4); c.stroke();
+    c.restore();
+  }
   const bw = Math.min(560, W * 0.44), bx = W / 2 - bw / 2, by = H * 0.72;
   c.fillStyle = 'rgba(255,255,255,0.08)'; rrect(c, bx, by, bw, 10, 5); c.fill();
   const pg = c.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#d79a00'); pg.addColorStop(1, '#ffe680');

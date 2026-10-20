@@ -877,7 +877,7 @@ function spawnEnemy(type) {
   if (d.boss || d.mini) {
     e.y = (BELT_TOP + BELT_BOT) / 2; e.setState('enter'); G.boss = e;
     G.banner = { title: d.mini ? 'ELITE' : 'WARNING', sub: d.name, t: 0, dur: 170, warn: true };
-    Music.play(stageDef().id === 'm12' ? 'final' : 'boss', stageDef().transpose || 0);
+    Music.play(stageDef().music === 'final' ? 'final' : 'boss', stageDef().transpose || 0);
     Sound.play('alarm'); Music.stinger('boss');
   }
   G.enemies.push(e);
@@ -1019,6 +1019,7 @@ function updTitle() {
   }
   if (!G.titleReady) {
     if (G.loadT === undefined || G.t - G.loadT < 18) return;   // still on the loading screen
+    if (!G.titleMusic) { G.titleMusic = true; Music.play('title'); }   // music starts once loading hits 100%
     if (Input.anyKey() || Input.mouse.click) { G.titleReady = true; Music.play('title'); Sound.play('confirm'); }
     return;
   }

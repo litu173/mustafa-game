@@ -34,7 +34,10 @@ const ITEM_IDX = { pizza: 0, hotdog: 1, meat: 2, apple: 3, gem: 4, gold: 5, pist
 
 function loadSprites() {
   { const im = new Image(); SPR.total++; im.onload = () => { SPR.port = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/portraits.jpg?v=1'; }
-  { const im = new Image(); SPR.total++; im.onload = () => { SPR.logo = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/logo.png?v=2'; }
+  // logo: small WebP first (the loading screen shows it), then the full-size one for big screens
+  { const im = new Image(); SPR.total++; im.onload = () => { SPR.logoSm = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/logo-sm.webp?v=3'; }
+  { const im = new Image(); SPR.total++; im.onload = () => { SPR.logo = im; SPR.loaded++; };
+    im.onerror = () => { im.onerror = () => { SPR.total--; }; im.src = 'assets/logo.png?v=2'; }; im.src = 'assets/logo.webp?v=3'; }
   const atlas = window.ATLAS || {};
   for (const name of Object.keys(atlas)) {
     const im = new Image(); SPR.total++;

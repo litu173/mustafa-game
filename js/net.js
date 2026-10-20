@@ -165,7 +165,7 @@ const Net = {
     const s = this.social, reqCount = s.requests.length + s.teamInvites.length;
     const head = `<header>
         <button class="back" data-act="back" aria-label="Back">◀</button>
-        <div class="brand"><img src="assets/logo.png?v=2" alt="Mustafa Reborn"><span class="sub">ONLINE ARENA</span></div>
+        <div class="brand"><img src="assets/logo-sm.webp?v=3" alt="Mustafa Reborn"><span class="sub">ONLINE ARENA</span></div>
         <span class="status ${this.status}"><i></i>${statusTxt}</span>
         ${this.status === 'offline' ? '<button class="btn sm" data-act="reconnect">Retry</button>' : ''}
         <label class="chan"># <select id="chanSelect">${(this.channels.length ? this.channels : [{ name: this.channel || 'Global', count: 0 }]).map(c => `<option value="${esc(c.name)}" ${c.name === this.channel ? 'selected' : ''}>${esc(c.name)} (${c.count})</option>`).join('')}${this.channel && !this.channels.some(c => c.name === this.channel) ? `<option selected>${esc(this.channel)}</option>` : ''}</select></label>
