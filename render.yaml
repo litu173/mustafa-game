@@ -1,7 +1,10 @@
 # One-click deploy of the Mustafa Reborn game + online server on Render (https://render.com)
 services:
   - type: web
-    name: mustafa-reborn
+    # This blueprint still manages the OLD service (renamed mustafa-game-old, kept for now).
+    # The live server is the separate service mustafa-reborn (https://mustafa-reborn.onrender.com).
+    # Once the old service is deleted, set this back to mustafa-reborn.
+    name: mustafa-game-old
     runtime: node
     plan: free
     buildCommand: npm install

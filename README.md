@@ -11,7 +11,7 @@ six bosses, and **online duels, free-for-alls and team-vs-team battles**.
 ## Play
 
 - **Play now:** https://litu173.github.io/mustafa-reborn/
-- **Online server:** https://mustafa-game.onrender.com
+- **Online server:** https://mustafa-reborn.onrender.com
 
 | Action | Keys |
 | --- | --- |
