@@ -207,13 +207,32 @@ function damage(t, a, dmg, m = {}) {
   return true;
 }
 
+// Is this the very last enemy of the mission? (last wave, nothing queued, nothing else standing)
+function isFinalKill(t) {
+  if (G.arena || !G.mission) return false;
+  const st = stageDef(); if (st.drive || G.waveIdx < st.waves.length - 1 || G.queue.length) return false;
+  if (G.mission.surv && G.mission.surv.t > 0) return false;
+  if (G.props.some(p => p.obj && !p.remove)) return false;
+  return !G.enemies.some(e => e !== t && e.hp > 0 && !e.docile && !e.leaving);
+}
+// the big finish: slow motion, white flash, shockwave, fire burst and the "ta-da ta-da ta-da BOOM"
+function bigKO(t, sub) {
+  G.slowmo = 120; G.flash = 20; G.flashCol = '#ffffff'; G.shake = 22; G.hitstop = 10;
+  Sound.play('ko'); Sound.play('boom');
+  G.banner = { title: 'K.O.!', sub, t: 0, dur: 150, big: true };
+  const z = 120 * (t.scale || 1);
+  addPart({ type: 'ring', x: t.x, y: t.y, z: 2, life: 30, size: 420, color: '#ffe9a8', flat: true });
+  addPart({ type: 'ring', x: t.x, y: t.y, z: 2, life: 22, size: 260, color: '#ff9a4a', flat: true });
+  for (let i = 0; i < 16; i++) addPart({ type: 'fire', x: t.x + rand(-60, 60), y: t.y + rand(-8, 8), z: z + rand(-40, 60), vx: rand(-5, 5), vz: rand(2, 7), life: rand(30, 50), size: rand(50, 90) });
+  for (let i = 0; i < 14; i++) addPart({ type: 'spark', x: t.x, y: t.y, z, vx: rand(-14, 14), vz: rand(4, 16), life: 40, size: 4, color: '#fff2b0' });
+  for (const p of G.players) p.inv = Math.max(p.inv, 220);
+}
 function onKO(t) {
   if (t.team !== 'enemy') return;
   addScore(t.def.score || 100);
+  if (!t.def.boss && isFinalKill(t)) { bigKO(t, 'MISSION ACCOMPLISHED'); return; }
   if (t.def.boss) {
-    G.slowmo = 110; G.flash = 16; G.flashCol = '#ffffff'; G.shake = 18;
-    Sound.play('ko');
-    G.banner = { title: 'K.O.!', sub: t.def.name + ' DEFEATED', t: 0, dur: 140, big: true };
+    bigKO(t, t.def.name + ' DEFEATED');
     for (const p of G.players) p.inv = Math.max(p.inv, 220);
     for (const e of G.enemies) if (e !== t && e.hp > 0) {
       e.hp = 0; e.koed = true; e.move = null; e.setState('fall'); e.vz = 8; e.vx = (e.x < t.x ? -1 : 1) * 6; e.bounce = true; e.z = Math.max(1, e.z);
@@ -1167,15 +1186,18 @@ function shadow(x, y, z, s) {
   ctx.fillStyle = `rgba(0,0,0,${0.38 * k})`;
   ctx.beginPath(); ctx.ellipse(x, y, 30 * s * k, 8 * s * k, 0, 0, TAU); ctx.fill();
 }
-function waterCut(x, y, w) {
-  ctx.save();
-  ctx.beginPath(); ctx.rect(x - w - 4, y - 62, w * 2 + 8, 90); ctx.clip();
-  const g = ctx.createLinearGradient(0, y - 62, 0, y + 20);
-  g.addColorStop(0, 'rgba(60,96,70,0.62)'); g.addColorStop(1, 'rgba(22,42,30,0.9)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y - 8, w, 56, 0, 0, TAU); ctx.fill();
+// Wading through water: just ripples around the legs, spreading out while the character moves
+function waterCut(x, y, w, o) {
+  const moving = o && (o.mspd || 0) > 0.6, t = G.t + ((o && o.id) || 0) * 13;
+  ctx.save(); ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(220,255,235,0.35)';
+  ctx.beginPath(); ctx.ellipse(x, y, w * 0.75, 6, 0, 0, TAU); ctx.stroke();
+  if (moving) for (let i = 0; i < 2; i++) {
+    const k = ((t * 0.035) + i * 0.5) % 1;
+    ctx.strokeStyle = `rgba(220,255,235,${0.45 * (1 - k)})`;
+    ctx.beginPath(); ctx.ellipse(x, y, w * (0.8 + k * 1.3), 6 + k * 9, 0, 0, TAU); ctx.stroke();
+  }
   ctx.restore();
-  ctx.strokeStyle = 'rgba(220,255,225,0.55)'; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.ellipse(x, y - 62, w * 0.85, 7, 0, 0, TAU); ctx.stroke();
 }
 const RIDE_POSE = Object.assign(basePose(), { lf: [1.35, 0.25], lb: [1.2, 0.15], af: [1.35, 1.7], ab: [1.25, 1.65], lean: 0.12, by: 4 });
 function drawFighter(f) {
@@ -1188,7 +1210,7 @@ function drawFighter(f) {
   if (f.state === 'drive' || (f.team === 'hero' && G.drive && f.state === 'dead')) {
     const bounce = Math.sin(G.t * 0.6) * 1.5 + (f.state === 'dead' ? 6 : 0);
     const pas = HEROES[(G.selIdx + 1) % HEROES.length];
-    if (!drawCarSpr(ctx, sx, f.y + bounce, f.state === 'dead' || f.hp < f.maxHp * 0.35, flash)) drawCar(ctx, sx, f.y, 1.55, { t: G.t, bounce, driver: flash ? whiteLook(f.look) : f.look, passenger: pas.look, driverPose: RIDE_POSE, col: f.royal ? '#151515' : '#c0262e' });
+    if (!drawCarSpr(ctx, sx, f.y + bounce, f.state === 'dead' || f.hp < f.maxHp * 0.35, flash, f.def.id, typeof allyId === 'function' ? allyId() : null)) drawCar(ctx, sx, f.y, 1.55, { t: G.t, bounce, driver: flash ? whiteLook(f.look) : f.look, passenger: pas.look, driverPose: RIDE_POSE, col: f.royal ? '#151515' : '#c0262e' });
     if (f.boostT > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, sx - 380, f.y - 60, 90, 'rgba(255,160,60,0.7)'); ctx.restore(); }
     ctx.restore(); return;
   }
@@ -1235,6 +1257,10 @@ function drawFighter(f) {
   }
   ctx.restore();
 }
+// colour grading for characters per stage / time of day, so painted fighters match the painted world
+const AMBIENT = { sea: 'sepia(0.12) saturate(1.05)', village: 'sepia(0.22) saturate(1.08) brightness(0.97)', swamp: 'saturate(0.82) brightness(0.93) hue-rotate(-6deg)',
+  garage: 'sepia(0.1) brightness(0.98)', lab: 'saturate(0.85) brightness(0.95) hue-rotate(-8deg)', fortress: 'saturate(0.82) brightness(0.92)', jungle: 'saturate(0.95) brightness(0.98)',
+  road: 'sepia(0.08)', night: 'saturate(0.8) brightness(0.9) hue-rotate(6deg)', dusk: 'sepia(0.18) saturate(0.95)', alarm: 'saturate(0.85)', rift: 'saturate(0.85) hue-rotate(8deg)' };
 function drawFighterSprite(f, spr, sx, sy, flash) {
   const d = f.def, m = f.state === 'attack' ? f.move : null;
   let face = f.facing;
@@ -1284,13 +1310,16 @@ function drawFighterSprite(f, spr, sx, sy, flash) {
     drawSprite(ctx, f.sprPrev.sheet, f.sprPrev.idx, bx, sy + bob, face, f.sprPrev.k, { sy: breathe, rot, sx: sxk });
     ctx.restore();
   }
-  if (d.hue) ctx.filter = `hue-rotate(${d.hue}deg) saturate(1.35) contrast(1.05)`;
+  const amb = AMBIENT[stageDef().look || stageDef().theme] || '';
+  if (d.glow) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, bx, sy - 140 * (spr.k / (spr.k || 1)), 170, rgba(d.glow, 0.22 + 0.08 * Math.sin(G.t * 0.12 + f.id))); ctx.restore(); }
+  if (amb) ctx.filter = amb;
   if (cycling) {
     // hold each painted frame, then flow into the next one over the second half of its slot
     const a = clamp((spr.blend - 0.4) / 0.6, 0, 1), e = a * a * (3 - 2 * a);
     drawSpriteBlend(ctx, spr.sheet, spr.idx, spr.next, e, bx, sy + bob, face, spr.k, { flash, sy: breathe, rot, sx: sxk });
   } else drawSprite(ctx, spr.sheet, spr.idx, bx, sy + bob, face, spr.k, { flash, sy: breathe, rot, sx: sxk });
-  if (d.hue) ctx.filter = 'none';
+  if (amb) ctx.filter = 'none';
+  if (d.glow && !flash) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= 0.18 + 0.06 * Math.sin(G.t * 0.15); drawSprite(ctx, spr.sheet, spr.idx, bx, sy + bob, face, spr.k, { tint: d.glow, sy: breathe, rot, sx: sxk }); ctx.restore(); }
   if (f.state === 'charge' && f.t < 26) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     glow(ctx, sx, sy - 120, 160, `rgba(255,80,40,${0.3 + 0.2 * Math.sin(f.t)})`);
@@ -1339,8 +1368,8 @@ function drawWorld() {
   drawBackground(ctx, st.theme, G.camX, G.t, st);
   for (const pr of G.props) shadow(pr.x - G.camX, pr.y, 0, CS * 0.9);
   for (const it of G.items) shadow(it.x - G.camX, it.y, it.z, CS * 0.5);
-  for (const f of G.enemies) if (!(f.state === 'dead' && (f.t >> 2) % 2 === 0)) shadow(f.x - G.camX, f.y, f.z, f.scale * (f.def.dino ? 1.7 : 1) * (f.def.rider ? 2.5 : 1));
-  for (const f of G.players) if (f.state !== 'out') shadow(f.x - G.camX, f.y, f.z, f.state === 'drive' ? 12 : f.scale);
+  if (!st.water) for (const f of G.enemies) if (!(f.state === 'dead' && (f.t >> 2) % 2 === 0)) shadow(f.x - G.camX, f.y, f.z, f.scale * (f.def.dino ? 1.7 : 1) * (f.def.rider ? 2.5 : 1));
+  if (!st.water) for (const f of G.players) if (f.state !== 'out') shadow(f.x - G.camX, f.y, f.z, f.state === 'drive' ? 12 : f.scale);
   if (!G.arena) drawMissionWorld(ctx);
   const list = [];
   for (const o of G.props) list.push([o.y, 0, o]);
@@ -1348,15 +1377,17 @@ function drawWorld() {
   for (const o of G.enemies) list.push([o.y, 2, o]);
   for (const o of G.players) if (o.state !== 'out') list.push([o.y + 0.5, 2, o]);
   for (const o of G.projs) list.push([o.y + 2, 3, o]);
+  if (!G.arena && G.mission && G.mission.car) list.push([G.mission.car.y, 4, G.mission.car]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, k, o] of list) {
     if (k === 0) drawPropSprite(ctx, o, o.x - G.camX, o.y);
     else if (k === 1) { if (o.life > 120 || (o.life >> 3) % 2) drawItemSprite(ctx, o.kind, o.x - G.camX, o.y - o.z - Math.sin(o.t * 0.08) * 4, o.t); }
     else if (k === 2) drawFighter(o);
+    else if (k === 4) drawParkedCar(ctx, o);
     else drawProjectile(ctx, o, o.x - G.camX, o.y - o.z);
-    if (st.water && k !== 3) {
+    if (st.water && k !== 3 && k !== 4) {
       const w = k === 2 ? (o.def.dino ? 46 : 34) * o.scale : 50;
-      if (!(k === 2 && o.def.flyer && o.z > 40)) waterCut(o.x - G.camX, o.y, w);
+      if (!(k === 2 && o.def.flyer && o.z > 40)) waterCut(o.x - G.camX, o.y, w, k === 2 ? o : null);
     }
   }
   drawParticles();

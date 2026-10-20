@@ -260,7 +260,7 @@ function drawHUD(c) {
     c.restore();
   }
   txt(c, 'LIVES', 122 + Math.min(G.lives, 6) * 26 + 4, 101, { font: '600 18px Teko, sans-serif', fill: '#bfae86' });
-  const wl = p.state === 'drive' ? 'J BOOST' : weaponLabel(p);
+  const wl = p.state === 'drive' ? (TOUCH ? 'ATTACK = BOOST' : 'J BOOST') : weaponLabel(p);
   if (wl) txt(c, wl, 442, 101, { font: '600 21px Teko, sans-serif', align: 'right', fill: '#ffe08a' });
   txt(c, String(G.score).padStart(8, '0'), W - 26, 52, { font: '600 44px Teko, sans-serif', align: 'right', fill: goldGrad(c, 18, 52), stroke: '#120800', sw: 5 });
   txt(c, 'HI ' + String(Math.max(Save.d.best, G.score)).padStart(8, '0'), W - 28, 76, { font: '500 20px Teko, sans-serif', align: 'right', fill: '#bfae86' });
@@ -283,7 +283,7 @@ function drawHUD(c) {
   }
   if (G.combo >= 2) {
     const pop = 1 + G.comboPop * 0.04;
-    c.save(); c.translate(W - 120, 165); c.scale(pop, pop);
+    c.save(); c.translate(TOUCH ? W - 290 : W - 120, TOUCH ? 175 : 165); c.scale(pop, pop);   // clear of the touch buttons
     txt(c, String(G.combo), 0, 0, { font: '700 64px Teko, sans-serif', align: 'center', fill: goldGrad(c, -50, 0), stroke: '#120800', sw: 6 });
     txt(c, 'HITS', 0, 24, { font: '900 18px Cinzel, serif', align: 'center', fill: '#f3dc9a', stroke: '#120800', sw: 4 });
     c.restore();

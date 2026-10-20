@@ -113,9 +113,11 @@ const Mission = {
       if (s.t % 60 === 0 && s.t <= 300 && s.t > 0) Sound.play('tick');
       if (s.t === 0) {
         G.queue = [];
-        for (const e of G.enemies) if (!e.def.boss && e.hp > 0) { e.leaving = true; e.move = null; if (e.state === 'attack') e.setState('idle'); }
-        G.banner = { title: 'WELL DONE', sub: m.car ? 'The Cadillac is safe' : 'They are retreating!', t: 0, dur: 150 };
-        Sound.play('fanfare'); Music.setIntensity(1);
+        const left = G.enemies.filter(e => e.hp > 0 && !e.docile).length;
+        G.banner = left ? { title: 'FINISH THEM!', sub: m.car ? 'Help is here. Take the rest down!' : 'No more are coming. Take them down!', t: 0, dur: 150, warn: true }
+                        : { title: 'WELL DONE', sub: m.car ? 'The Cadillac is safe' : 'You held the line!', t: 0, dur: 150 };
+        Sound.play(left ? 'alarm' : 'fanfare'); Music.setIntensity(left ? 3 : 1);
+        for (const e of G.enemies) e.vsCar = false;
         if (m.car) m.car.safe = true;
       }
     }
@@ -152,8 +154,8 @@ const Mission = {
     popText(pr.x, pr.y, 260, fmt(info.done), '#7dff9a', 34);
     addScore(1500);
     G.shake = Math.max(G.shake, 10);
-    if (pr.kind === 'tank') { explodeFx(pr.x, pr.y, 80, 160); Sound.play('boom'); for (let i = 0; i < 18; i++) addPart({ type: 'spark', x: pr.x + rand(-40, 40), y: pr.y, z: rand(40, 200), vx: rand(-8, 8), vz: rand(2, 12), life: 40, color: '#7dff6a' }); }
-    else if (pr.kind === 'jammer') { Sound.play('break'); Sound.play('static'); for (let i = 0; i < 14; i++) addPart({ type: 'spark', x: pr.x, y: pr.y, z: 150, vx: rand(-9, 9), vz: rand(3, 13), life: 30, color: '#9fd8ff' }); }
+    if (pr.kind === 'tank') { explodeFx(pr.x, pr.y, 80, 160); Sound.play('boom'); for (let i = 0; i < 18; i++) addPart({ type: 'spark', x: pr.x + rand(-40, 40), y: pr.y, z: rand(40, 200), vx: rand(-8, 8), vz: rand(2, 12), life: 40, size: 4, color: '#7dff6a' }); }
+    else if (pr.kind === 'jammer') { Sound.play('break'); Sound.play('static'); for (let i = 0; i < 14; i++) addPart({ type: 'spark', x: pr.x, y: pr.y, z: 150, vx: rand(-9, 9), vz: rand(3, 13), life: 30, size: 3, color: '#9fd8ff' }); }
     else Sound.play('break');
     if (pr.kind === 'cage') m.freed.push({ kind: 'cage', x: pr.x, y: pr.y, vx: 7, t: 0 });
     if (pr.kind === 'lock') { m.freed.push({ kind: 'lock', x: pr.x, y: pr.y + 10, vx: 6, t: 0 }); Sound.play('roar'); }
@@ -535,12 +537,13 @@ function drawObjProp(c, pr, x, y) {
   }
   c.restore();
 }
+function drawParkedCar(c, car) {
+  const x = car.x - G.camX, fl = car.flash > 0 && car.flash % 2, dmgd = car.hp < car.max * 0.4;
+  if (has('car_park')) { const fr = window.ATLAS.car_park[dmgd ? 1 : 0]; drawSprite(c, 'car_park', dmgd ? 1 : 0, x, car.y, 1, 640 / fr.w, { flash: fl }); }
+  else drawCar(c, x, car.y, 1.55, { t: 0, col: '#c0262e' });
+}
 function drawMissionWorld(c) {
   const m = G.mission; if (!m) return;
-  if (m.car) {
-    const x = m.car.x - G.camX;
-    if (!drawCarSpr(c, x, m.car.y, m.car.hp < m.car.max * 0.4, m.car.flash > 0 && m.car.flash % 2)) drawCar(c, x, m.car.y, 1.55, { t: 0, col: '#c0262e' });
-  }
   for (const f of m.freed) {
     if (f.t < 0) continue;
     const x = f.x - G.camX, a = Math.min(1, (260 - f.t) / 40);

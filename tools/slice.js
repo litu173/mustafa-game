@@ -16,9 +16,9 @@ const SHEETS = {
   razor: 8, motka: 8, poacher: 8, biker: 8, lash: 8, butcher: 8, saju: 8, morgol: 8, kaiser: 8, mutant: 8,
   raptor: 8, rex: 8, trike: 6, ptera: 6, car: 2, hog: 5, items: 18,
   // smooth-animation sheets (0 = detect the number of poses automatically)
-  mustafa_c: 0, mustafa_d: 8, rakib_c: 0, rakib_d: 8, nadia_c: 0, nadia_d: 8, bablu_c: 0, bablu_d: 8,
+  mustafa_c: 9, mustafa_d: 8, rakib_c: 0, rakib_d: 8, nadia_c: 0, nadia_d: 8, bablu_c: 9, bablu_d: 8,
   razor_w: 8, motka_w: 8, poacher_w: 8, biker_w: 8, lash_w: 8, raptor_r: 8,
-  rex_w: 8, trike_w: 8, ptera_f: 8,
+  rex_w: 8, trike_w: 8, ptera_f: 8, car_park: 2,
 };
 /* Size normalisation: each sheet was painted separately, so the same character can come out
    a few percent bigger or smaller. [baseSheet, base frames, this sheet's frames] are standing
@@ -87,6 +87,41 @@ function keyMagenta(img) {
     d[i * 4 + 2] = Math.max(0, Math.min(255, (b - k * 255) * inv));
     d[i * 4 + 3] = Math.round(a * 255);
   }
+  despill(img);
+}
+// See-through parts (windshield glass, smoke) show the magenta backdrop through them: turn that into
+// faint grey-blue glass / grey smoke with matching transparency.
+function clearTint(img) {
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const r = d[i], g = d[i + 1], b = d[i + 2], spill = Math.min(r, b) - g;
+    if (spill < 25) continue;
+    const k = Math.min(1, spill / 140), base = g + 20;
+    d[i] = base * 0.92; d[i + 1] = base; d[i + 2] = Math.min(255, base * 1.12);
+    d[i + 3] = Math.round(d[i + 3] * (1 - 0.75 * k));
+  }
+}
+// Painted edges blend the dark outline with the magenta backdrop, leaving a purple rim. Within a few
+// pixels of the transparent area, pull any magenta tint out of the colour and fade the worst rim pixels.
+function despill(img) {
+  const d = img.data, w = img.w, h = img.h, R = 3;
+  const near = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (d[(y * w + x) * 4 + 3] > 200) continue;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && yy >= 0 && xx < w && yy < h) near[yy * w + xx] = Math.max(near[yy * w + xx], R + 1 - Math.max(Math.abs(dx), Math.abs(dy)));
+    }
+  }
+  for (let i = 0; i < w * h; i++) {
+    const p = i * 4; if (!near[i] || d[p + 3] === 0) continue;
+    const r = d[p], g = d[p + 1], b = d[p + 2], spill = Math.min(r, b) - g;   // magenta = red and blue above green
+    if (spill <= 6) continue;
+    const k = near[i] / (R + 1);
+    d[p] = Math.max(0, r - spill * (0.6 + 0.4 * k)); d[p + 2] = Math.max(0, b - spill * (0.6 + 0.4 * k));
+    if (near[i] >= R && spill > 40) d[p + 3] = Math.round(d[p + 3] * (1 - Math.min(0.85, spill / 160)));   // outermost purple pixels fade away
+  }
 }
 
 /* ---------- connected components on the alpha mask ---------- */
@@ -113,9 +148,24 @@ function components(img) {
 const gap = (a, b) => Math.max(0, Math.max(a.x0, b.x0) - Math.min(a.x1, b.x1)) + Math.max(0, Math.max(a.y0, b.y0) - Math.min(a.y1, b.y1));
 function mergeInto(a, b) { a.x0 = Math.min(a.x0, b.x0); a.y0 = Math.min(a.y0, b.y0); a.x1 = Math.max(a.x1, b.x1); a.y1 = Math.max(a.y1, b.y1); a.n += b.n; a.ids = a.ids.concat(b.ids); }
 
+// Painted HD sheets live in assets/raw/hd; big creatures come in two halves (name1 + name2) joined side by side.
+function loadSheet(name) {
+  const hd = path.join(RAW, 'hd');
+  if (fs.existsSync(path.join(hd, name + '.png'))) return readPNG(path.join(hd, name + '.png'));
+  if (fs.existsSync(path.join(hd, name + '1.png'))) {
+    const a = readPNG(path.join(hd, name + '1.png')), b = readPNG(path.join(hd, name + '2.png'));
+    const w = a.w + b.w, h = Math.max(a.h, b.h), data = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < w * h; i++) { data[i * 4] = 255; data[i * 4 + 2] = 255; data[i * 4 + 3] = 255; }   // magenta fill
+    for (const [img, ox] of [[a, 0], [b, a.w]]) for (let y = 0; y < img.h; y++) img.data.copy(data, (y * w + ox) * 4, y * img.w * 4, (y + 1) * img.w * 4);
+    return { w, h, data };
+  }
+  return readPNG(path.join(RAW, name + '.png'));
+}
+const hasSheet = name => ['hd/' + name, 'hd/' + name + '1', name].some(n => fs.existsSync(path.join(RAW, n + '.png')));
 function sliceSheet(name, count) {
-  const img = readPNG(path.join(RAW, name + '.png'));
+  const img = loadSheet(name);
   keyMagenta(img);
+  if (name === 'car_park') clearTint(img);
   const { lab, comps } = components(img);
   const big = Math.max(...comps.map(c => c.n));
   let groups = comps.filter(c => c.n > big * 0.04).map(c => ({ ...c, ids: [c.id] }));
@@ -202,7 +252,7 @@ function nearOwn(lab, ids, w, h, x, y) {
 fs.mkdirSync(OUT, { recursive: true });
 const atlas = {};
 for (const [name, count] of Object.entries(SHEETS)) {
-  if (!fs.existsSync(path.join(RAW, name + '.png'))) { console.warn('missing', name); continue; }
+  if (!hasSheet(name)) { console.warn('missing', name); continue; }
   atlas[name] = sliceSheet(name, count);
   console.log(name.padEnd(10), atlas[name].map(f => `${f.w}x${f.h}`).join(' '));
 }

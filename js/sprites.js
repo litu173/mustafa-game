@@ -5,6 +5,7 @@
    Every frame faces right; (ax, ay) is the foot anchor inside the frame.
    The code-drawn art in art.js stays as a fallback while images load.
    ========================================================= */
+const SPRITE_V = 'hd3';   // bump when the art is regenerated, so browsers fetch the new sheets
 const SPR = { img: {}, flash: {}, tint: {}, head: {}, bg: {}, cover: null, loaded: 0, total: 0 };
 
 // sheet names + on-screen height of the reference frame (ref: 0 = stance, 1 = walk)
@@ -43,7 +44,7 @@ function loadSprites() {
     const im = new Image(); SPR.total++;
     im.onload = () => { SPR.img[name] = im; SPR.flash[name] = tinted(im, '#fff6e0', 1); findHead(name, im); if (name === 'ptera_f') alignByCrest(name, im); SPR.loaded++; };
     im.onerror = () => { SPR.total--; };
-    im.src = 'assets/sprites/' + name + '.png';
+    im.src = 'assets/sprites/' + name + '.png?v=' + SPRITE_V;
   }
   for (const t of ['sea', 'swamp', 'road', 'garage', 'village', 'lab', 'jungle', 'fortress', 'cover']) {
     const im = new Image(); SPR.total++;
@@ -293,7 +294,18 @@ function drawItemSpr(c, kind, x, y, k = 0.42) {
   if (!spritesReady('items') || ITEM_IDX[kind] === undefined) return false;
   return drawSprite(c, 'items', ITEM_IDX[kind], x, y, 1, k);
 }
-function drawCarSpr(c, x, y, damaged, flash) {
+function drawCarSpr(c, x, y, damaged, flash, driver, passenger) {
+  if (has('car_park')) {
+    const fr = window.ATLAS.car_park[damaged ? 1 : 0], k = 760 / fr.w, left = x - fr.ax * k, top = y - fr.ay * k;
+    // the crew sits in the seats; the car body is drawn over their legs
+    for (const [id, fx] of [[passenger, 0.4], [driver, 0.55]]) {
+      if (!id) continue;
+      const sh = id + '_a'; if (!spritesReady(sh)) continue;
+      const hf = window.ATLAS[sh][0], hk = (fr.h * k * 0.95) / hf.h;
+      drawSprite(c, sh, 0, left + fr.w * k * fx, top + fr.h * k * 0.92, 1, hk, { flash });
+    }
+    return drawSprite(c, 'car_park', damaged ? 1 : 0, x, y, 1, k, { flash });
+  }
   if (!spritesReady('car')) return false;
   const fr = window.ATLAS.car[0];
   return drawSprite(c, 'car', damaged ? 1 : 0, x, y, 1, 760 / fr.w, { flash });

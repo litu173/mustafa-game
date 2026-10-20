@@ -81,14 +81,14 @@ const ENEMY_DEFS = {
     melee: ['eswoop'],
   },
   // ---- elite variants (same art, recoloured, much tougher) ----
-  razorX: { spr: 'razor', hue: 190, name: 'FANG ELITE', hp: 82, speed: 4.3, reach: 70, melee: ['eslash', 'edash'], cool: [32, 60], score: 500, weapon: 'knife', drop: { knife: 0.3, pizza: 0.2 }, elite: true },
-  motkaX: { spr: 'motka', hue: 250, name: 'IRON MOTKA', hp: 210, speed: 2.8, reach: 76, melee: ['epunch', 'ebelly', 'eheavy'], cool: [45, 80], score: 900, heavy: true, drop: { meat: 0.6 }, elite: true },
-  poacherX: { spr: 'poacher', hue: 70, name: 'FANG SNIPER', hp: 76, speed: 3.1, reach: 66, melee: ['epunch'], ranged: 'eshoot', keepAway: true, cool: [40, 75], score: 700, weapon: 'rifle', drop: { rifle: 0.5, shotgun: 0.2 }, elite: true },
-  raptorX: { spr: 'raptor', hue: 150, sprScale: 1.22, name: 'ALPHA RAPTOR', hp: 150, speed: 6.0, reach: 110, melee: ['ebite', 'egore'], cool: [30, 60], score: 1500, dino: 'raptor', radius: 30, heavy: true, col: '#3a7a8a', stripe: '#1a3a44', drop: { meat: 0.8 }, elite: true },
-  captain: { spr: 'razor', hue: 320, sprScale: 1.12, name: 'FANG CAPTAIN', hp: 300, speed: 4.0, reach: 80, melee: ['eslash', 'edash', 'eheavy'], cool: [28, 55], score: 3000, weapon: 'knife', heavy: true, mini: true, drop: { meat: 1 }, elite: true },
+  razorX: { spr: 'razor', glow: '#4aa8ff', name: 'FANG ELITE', hp: 82, speed: 4.3, reach: 70, melee: ['eslash', 'edash'], cool: [32, 60], score: 500, weapon: 'knife', drop: { knife: 0.3, pizza: 0.2 }, elite: true },
+  motkaX: { spr: 'motka', glow: '#c0c8d8', name: 'IRON MOTKA', hp: 210, speed: 2.8, reach: 76, melee: ['epunch', 'ebelly', 'eheavy'], cool: [45, 80], score: 900, heavy: true, drop: { meat: 0.6 }, elite: true },
+  poacherX: { spr: 'poacher', glow: '#7dff6a', name: 'FANG SNIPER', hp: 76, speed: 3.1, reach: 66, melee: ['epunch'], ranged: 'eshoot', keepAway: true, cool: [40, 75], score: 700, weapon: 'rifle', drop: { rifle: 0.5, shotgun: 0.2 }, elite: true },
+  raptorX: { spr: 'raptor', glow: '#ff5a3a', sprScale: 1.22, name: 'ALPHA RAPTOR', hp: 150, speed: 6.0, reach: 110, melee: ['ebite', 'egore'], cool: [30, 60], score: 1500, dino: 'raptor', radius: 30, heavy: true, col: '#3a7a8a', stripe: '#1a3a44', drop: { meat: 0.8 }, elite: true },
+  captain: { spr: 'razor', glow: '#ffcc33', sprScale: 1.12, name: 'FANG CAPTAIN', hp: 300, speed: 4.0, reach: 80, melee: ['eslash', 'edash', 'eheavy'], cool: [28, 55], score: 3000, weapon: 'knife', heavy: true, mini: true, drop: { meat: 1 }, elite: true },
   // ---- Kaiser's sci-fi soldiers ----
-  raptorC: { spr: 'raptor', hue: 185, sprScale: 1.06, name: 'CYBER RAPTOR', hp: 105, speed: 5.8, reach: 100, melee: ['ebite'], ranged: 'elaser', cool: [32, 62], score: 1100, dino: 'raptor', radius: 24, col: '#3a8a9a', stripe: '#123a44', drop: { meat: 0.3 }, elite: true, cyber: true },
-  trooper: { spr: 'poacher', hue: 255, name: 'FANG TROOPER', hp: 84, speed: 3.3, reach: 66, melee: ['epunch', 'ekick'], ranged: 'elaser', keepAway: true, cool: [38, 68], score: 800, weapon: 'rifle', drop: { rifle: 0.3, grenade: 0.15 }, elite: true, cyber: true },
+  raptorC: { spr: 'raptor', glow: '#3ae0ff', sprScale: 1.06, name: 'CYBER RAPTOR', hp: 105, speed: 5.8, reach: 100, melee: ['ebite'], ranged: 'elaser', cool: [32, 62], score: 1100, dino: 'raptor', radius: 24, col: '#3a8a9a', stripe: '#123a44', drop: { meat: 0.3 }, elite: true, cyber: true },
+  trooper: { spr: 'poacher', glow: '#3ae0ff', name: 'FANG TROOPER', hp: 84, speed: 3.3, reach: 66, melee: ['epunch', 'ekick'], ranged: 'elaser', keepAway: true, cool: [38, 68], score: 800, weapon: 'rifle', drop: { rifle: 0.3, grenade: 0.15 }, elite: true, cyber: true },
   // ---- bosses ----
   tusker: {
     name: 'TUSKER', boss: true, hp: 540, speed: 3.8, reach: 150, melee: ['ebite', 'estomp'], charge: true, cool: [35, 70], score: 7000,
