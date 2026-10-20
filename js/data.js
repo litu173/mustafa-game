@@ -239,7 +239,7 @@ const STAGES = [
     bark: { 0: ['nadia', 'Babies in cages... break those locks!'], 2: ['bablu', 'Do not hit the big one with the horns. It is on our side!'], 4: ['nadia', 'The pack alpha! It thinks we took its young!'] },
   },
   {
-    id: 'm5', chapter: 1, name: 'BLACK WATER', sub: 'An ambush in the glowing swamp', theme: 'swamp', look: 'dusk', weather: 'fog', water: true, transpose: 2, len: 4500, maxOn: 5, music: 'stealth',
+    id: 'm5', chapter: 1, name: 'BLACK WATER', sub: 'An ambush in the glowing swamp', theme: 'swamp', look: 'dusk', weather: 'fog', water: true, transpose: 2, len: 4500, maxOn: 5, music: 'ambush',
     obj: { type: 'survive', text: 'Survive the ambush until Bolt brings the boat' },
     brief: 'Following the poachers into the swamp was a trap, and the water glows green with leaked serum. Hold the line until Bolt arrives with the boat.',
     waves: [
@@ -276,7 +276,7 @@ const STAGES = [
     bark: { 0: ['rakib', 'My tools! My beautiful tools!'], 2: ['rakib', 'They are going for the car! Do not let them scratch it!'] },
   },
   {
-    id: 'm8', chapter: 2, name: 'SHADOW IN THE RAIN', sub: 'Saju strikes from the dark', theme: 'garage', look: 'night', weather: 'storm', transpose: 3, len: 3600, maxOn: 5, music: 'boss', after: 'abduction',
+    id: 'm8', chapter: 2, name: 'SHADOW IN THE RAIN', sub: 'Saju strikes from the dark', theme: 'garage', look: 'night', weather: 'storm', transpose: 3, len: 3600, maxOn: 5, music: 'storm', after: 'abduction',
     obj: { type: 'boss', text: 'Defeat Shadow Saju' },
     brief: 'The lights died. Shadow Saju, Kaiser’s assassin, is hunting us in our own home. Trust nothing in the dark.',
     waves: [
@@ -317,7 +317,7 @@ const STAGES = [
     bark: { 0: ['{ALLY}', 'Searchlights everywhere. Break the locks and keep moving!'], 2: ['{ALLY}', 'Cyber-raptors on the deck! Watch the lasers!'], 4: ['morgol', 'Every beast in this valley belongs to Kaiser. You too!'] },
   },
   {
-    id: 'm11', chapter: 3, name: 'PRISON BLOCK NINE', sub: 'Bring {CAPTIVE} home', theme: 'lab', look: 'alarm', transpose: -3, len: 5400, maxOn: 5, music: 'lab', captive: true,
+    id: 'm11', chapter: 3, name: 'PRISON BLOCK NINE', sub: 'Bring {CAPTIVE} home', theme: 'lab', look: 'alarm', transpose: -3, len: 5400, maxOn: 5, music: 'prison', captive: true,
     obj: { type: 'destroy', kind: 'core', text: 'Shut down the power cores and break {CAPTIVE} out' },
     brief: '{CAPTIVE} is locked in a stasis capsule in Prison Block Nine, being prepared for Kaiser’s cyborg program. Destroy the power cores, then smash the capsule. Nobody gets left behind.',
     waves: [
@@ -344,7 +344,7 @@ const STAGES = [
     bark: { 0: ['nadia', 'Alarm! The clock is running, Mustafa!'], 2: ['rakib', 'Those tanks are glass. Hit them hard!'], 3: ['kaiser', 'You are too late. The rift is already opening.'] },
   },
   {
-    id: 'm13', chapter: 4, name: 'THE TIME RIFT', sub: 'A doorway to 65 million years ago', theme: 'jungle', look: 'rift', weather: 'storm', transpose: -1, len: 5400, maxOn: 5, music: 'fortress',
+    id: 'm13', chapter: 4, name: 'THE TIME RIFT', sub: 'A doorway to 65 million years ago', theme: 'jungle', look: 'rift', weather: 'storm', transpose: -1, len: 5400, maxOn: 5, music: 'rift',
     obj: { type: 'destroy', kind: 'pylon', text: 'Destroy the rift pylons before the past breaks through' },
     brief: 'Kaiser fed the Chrono-Fang crystal into his machine and tore a hole in time above the Green Valley. Cyber-raptors and wild beasts are pouring out. Destroy the pylons holding the rift open.',
     waves: [

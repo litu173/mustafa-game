@@ -149,11 +149,19 @@ function drawSelect(c) {
   c.strokeStyle = 'rgba(212,175,55,0.6)'; c.lineWidth = 1.5; line(c, W / 2 - 330, 88, W / 2 - 40, 88); line(c, W / 2 + 40, 88, W / 2 + 330, 88);
   txt(c, '◆', W / 2, 94, { font: '700 14px serif', align: 'center', fill: '#d4af37' });
   G.rects = [];
+  // smooth focus animation: each card eases toward selected (1) or not (0)
+  G.selK = G.selK || HEROES.map(() => 0);
+  if (G.selLast !== G.selIdx) { G.selLast = G.selIdx; G.selPoseT = 0; }
+  G.selPoseT = (G.selPoseT || 0) + 1;
   HEROES.forEach((h, i) => {
-    const sel = G.selIdx === i, w = 262, hgt = 470, x = (W - BASE_W) / 2 + 70 + i * 292, y = 108 - (sel ? 10 : 0);
-    G.rects.push({ x, y, w, h: hgt, i });
+    const sel = G.selIdx === i;
+    G.selK[i] += ((sel ? 1 : 0) - G.selK[i]) * 0.14;
+    const k = G.selK[i], w = 262, hgt = 470, x = (W - BASE_W) / 2 + 70 + i * 292, y = 108 - 16 * k;
+    G.rects.push({ x, y: 108, w, h: hgt, i });
     c.save();
-    if (sel) { c.shadowColor = 'rgba(255,190,80,0.55)'; c.shadowBlur = 36; }
+    c.translate(x + w / 2, y + hgt / 2); c.scale(1 + 0.04 * k, 1 + 0.04 * k); c.translate(-(x + w / 2), -(y + hgt / 2));
+    c.save();
+    if (k > 0.05) { c.shadowColor = `rgba(255,190,80,${0.6 * k})`; c.shadowBlur = 40 * k; }
     rrect(c, x, y, w, hgt, 16);
     const cg = c.createLinearGradient(0, y, 0, y + hgt); cg.addColorStop(0, sel ? '#3a2212' : '#1d1214'); cg.addColorStop(1, '#0a0707');
     c.fillStyle = cg; c.fill();
@@ -166,14 +174,18 @@ function drawSelect(c) {
     const fy = y + hgt - 118;
     c.fillStyle = sel ? 'rgba(212,175,55,0.45)' : 'rgba(212,175,55,0.15)'; c.beginPath(); c.ellipse(x + w / 2, fy, 90, 15, 0, 0, TAU); c.fill();
     c.strokeStyle = 'rgba(212,175,55,0.6)'; c.lineWidth = 1.5; c.stroke();
-    const look = heroLook(i), state = sel ? (G.sceneT % 240 < 40 ? 'win' : 'idle') : 'idle';
-    c.save(); rrect(c, x, y, w, hgt, 16); c.clip();
-    const sd = SPRITE_DEFS[h.id];
+    const look = heroLook(i), sd = SPRITE_DEFS[h.id];
     if (G.royal && Save.d.premium) { c.save(); c.globalCompositeOperation = 'lighter'; glow(c, x + w / 2, fy - 160, 170, 'rgba(212,175,55,0.35)'); c.restore(); }
-    if (!(spritesReady(sd.a) && spritesReady(sd.b) && drawSprite(c, state === 'win' ? sd.b : sd.a, state === 'win' ? 7 : 0, x + w / 2, fy, 1, spriteScale(h.id) * 1.05, { sy: 1 + Math.sin(t * 0.08 + i) * 0.01 })))
-      drawFigure(c, look, poseFor(i, state, t, i === 0 ? { weapon: 'rifle' } : null), x + w / 2 - 6, fy, 1, 1.72 * (h.look.scale || 1), { t, weapon: i === 0 ? 'rifle' : null });
-    c.restore();
-    if (!sel) { c.fillStyle = 'rgba(5,3,4,0.45)'; rrect(c, x, y, w, hgt, 16); c.fill(); }
+    // the hero is drawn unclipped and sized to fit, so raised fists are never cut off;
+    // a freshly selected hero raises a fist, then eases back into the stance
+    const pt = sel ? G.selPoseT : 999, win = pt < 12 ? pt / 12 : pt < 60 ? 1 : pt < 76 ? 1 - (pt - 60) / 16 : 0;
+    const fit = (sheet, idx) => { const fr = window.ATLAS[sheet][idx]; return Math.min(spriteScale(h.id) * 1.05, (fy - y - 18) / fr.ay); };
+    const breathe = 1 + Math.sin(t * 0.08 + i) * 0.012, bob = Math.sin(t * 0.05 + i) * 2 * k;
+    if (spritesReady(sd.a) && spritesReady(sd.b)) {
+      if (win < 1) { c.save(); c.globalAlpha *= 1 - win; drawSprite(c, sd.a, 0, x + w / 2, fy + bob, 1, fit(sd.a, 0), { sy: breathe }); c.restore(); }
+      if (win > 0) { c.save(); c.globalAlpha *= win; drawSprite(c, sd.b, 7, x + w / 2, fy + bob, 1, fit(sd.b, 7), { sy: breathe }); c.restore(); }
+    } else drawFigure(c, look, poseFor(i, 'idle', t, i === 0 ? { weapon: 'rifle' } : null), x + w / 2 - 6, fy, 1, 1.72 * (h.look.scale || 1), { t, weapon: i === 0 ? 'rifle' : null });
+    if (k < 0.99) { c.fillStyle = `rgba(5,3,4,${0.45 * (1 - k)})`; rrect(c, x, y, w, hgt, 16); c.fill(); }
     c.lineWidth = sel ? 3 : 1.5; c.strokeStyle = sel ? goldGrad(c, y, y + hgt) : 'rgba(212,175,55,0.35)'; rrect(c, x, y, w, hgt, 16); c.stroke();
     txt(c, h.name, x + w / 2, y + hgt - 78, { font: '900 30px Cinzel, serif', align: 'center', fill: sel ? goldGrad(c, y + hgt - 102, y + hgt - 76) : '#e8dcc0', stroke: '#120800', sw: 5 });
     txt(c, h.title.toUpperCase(), x + w / 2, y + hgt - 57, { font: '700 13px Cinzel, serif', align: 'center', fill: '#bfae86' });
@@ -185,6 +197,7 @@ function drawSelect(c) {
         c.save(); c.translate(x + 120 + d * 22, ry); c.rotate(Math.PI / 4); c.fillRect(-4, -4, 8, 8); c.restore();
       }
     });
+    c.restore();
   });
   const h = HEROES[G.selIdx];
   txt(c, h.desc, W / 2, 624, { font: '600 20px Cinzel, serif', align: 'center', fill: '#efe3c8' });
@@ -418,26 +431,11 @@ function drawEnding(c) {
 }
 
 /* ---------- Cover title (painted poster) ---------- */
-let COVER_BG = null;
+// The cover fills the whole screen. On wider screens the bottom (car wheels) is trimmed, never the top (the T-rex).
 function coverImage(c, t) {
-  const im = SPR.cover;
-  if (!COVER_BG || COVER_BG.width !== W) {   // blurred backdrop for the spare space around the painting
-    COVER_BG = document.createElement('canvas'); COVER_BG.width = W; COVER_BG.height = H;
-    const b = COVER_BG.getContext('2d'), z = Math.max(W / im.width, H / im.height) * 1.1;
-    b.filter = 'blur(18px) brightness(0.55)'; b.drawImage(im, (W - im.width * z) / 2, (H - im.height * z) / 2, im.width * z, im.height * z); b.filter = 'none';
-  }
-  c.drawImage(COVER_BG, 0, 0);
-  // the full painting, slightly smaller than the screen so the logo has sky above the heroes
-  const z = Math.min(W / im.width, H / im.height) * (0.9 + Math.sin(t * 0.004) * 0.008), w = im.width * z, h = im.height * z, x = (W - w) / 2, y = H - h;
-  c.drawImage(im, x, y, w, h);
-  // feather the painting's edges into the backdrop
-  c.save();
-  const top = c.createLinearGradient(0, y, 0, y + 60); top.addColorStop(0, 'rgba(12,6,8,0.9)'); top.addColorStop(1, 'rgba(12,6,8,0)'); c.fillStyle = top; c.fillRect(x, y, w, 60);
-  if (x > 1) {
-    const l = c.createLinearGradient(x, 0, x + 70, 0); l.addColorStop(0, 'rgba(12,6,8,0.9)'); l.addColorStop(1, 'rgba(12,6,8,0)'); c.fillStyle = l; c.fillRect(x, y, 70, h);
-    const r = c.createLinearGradient(x + w, 0, x + w - 70, 0); r.addColorStop(0, 'rgba(12,6,8,0.9)'); r.addColorStop(1, 'rgba(12,6,8,0)'); c.fillStyle = r; c.fillRect(x + w - 70, y, 70, h);
-  }
-  c.restore();
+  const im = SPR.cover, z = Math.max(W / im.width, H / im.height) * (1.02 + Math.sin(t * 0.004) * 0.012);
+  const w = im.width * z, h = im.height * z;
+  c.drawImage(im, (W - w) / 2, Math.min(0, (H - h) * 0.15), w, h);
 }
 function drawTitleCover(c) {
   const t = G.t;

@@ -925,6 +925,7 @@ function loadStage(i) {
   G.stageIdx = i;
   G.enemies = []; G.items = []; G.projs = []; G.parts = []; G.texts = [];
   G.props = st.props.map(a => makeProp(a[0], a[1], a[2], a[3]));
+  setFloor(st.theme);
   G.camX = 0; G.camLock = null; G.waveIdx = 0; G.queue = []; G.goT = 0; G.boss = null;
   G.combo = 0; G.comboT = 0; G.focus = null; G.stageTime = 0; G.banner = null; G.paused = false;
   G.hitstop = 0; G.slowmo = 0; G.flash = 0; G.shake = 0;

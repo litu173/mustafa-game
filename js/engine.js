@@ -6,7 +6,8 @@
 // H is fixed; W stretches between 1280 (16:9) and 1600 (20:9) so wide phone screens are filled edge to edge
 let W = 1280;
 const H = 720, BASE_W = 1280;
-const HORIZON = 420, BELT_TOP = 482, BELT_BOT = 702;
+const HORIZON = 420;
+let BELT_TOP = 482, BELT_BOT = 702;   // the walkable floor band; set per stage by setFloor()
 const CS = 1.85;              // character scale: fighters ~300px tall like the arcade original
 const LOW_W = 427, LOW_H = 240; // arcade-style low-res buffer (CPS-1 is 384x224)
 const TAU = Math.PI * 2;

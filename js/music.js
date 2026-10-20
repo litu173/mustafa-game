@@ -72,6 +72,25 @@ const SCORES = (() => { const _ = null, h = HOLD; return {
     kit: { k: 'K...K...K...K...', h: '..h...h...h...h.', s: '....S.......S...' },
     mels: [{ inst: 'lead', notes: [12, h, h, 14, h, h, 15, h, 17, h, h, h, 15, h, 14, h, 12, h, h, 10, h, h, 9, h, 10, h, h, h, _, _, _, _] },
       { inst: 'brass', lv: 3, notes: [24, h, h, h, h, h, h, h, 22, h, h, h, h, h, h, h, 19, h, h, h, h, h, h, h, 21, h, h, h, h, h, h, h] }] },
+  // ---- extra mission themes: every mission has its own ----
+  ambush: { bpm: 112, key: N('E'), bars: [['E', 1], ['F', 0], ['E', 1], ['D', 0], ['C', 0], ['F', 0], ['E', 1], ['E', 1]], pad: 0.8,
+    lv: { taiko: 0, ost: 1, mel: 2, choir: 3, rim: 1 }, taiko: 'T..T..T.T..T.tTt', rim: '..r..r....r..r..', choir: true,
+    ost: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 3, 1, 0, 1, 0, _],
+    mels: [{ inst: 'flute', notes: [12, h, 13, h, 12, h, 10, h, 8, h, h, h, 7, h, h, h, 8, h, 10, h, 12, h, 13, h, 15, h, h, h, 13, h, 12, h] },
+      { inst: 'brass', lv: 3, oct: -12, notes: [12, h, h, h, h, h, h, h, 13, h, h, h, 12, h, h, h] }] },
+  storm: { bpm: 126, key: N('G'), bars: [['G', 1], ['Eb', 0], ['C', 1], ['D', 0], ['G', 1], ['Eb', 0], ['F', 0], ['D', 0]], pad: 0.9, bass: '8th',
+    lv: { ost: 0, rim: 0, kit: 1, mel: 1, choir: 3 }, ost: [0, 12, 7, 12, 0, 12, 7, 12, 0, 12, 8, 12, 0, 12, 7, 3], rim: '....r.......r.rr', choir: true,
+    kit: { k: 'K.....K...K.....', s: '....S.......S...', h: 'h.h.h.h.h.h.h.h.' },
+    mels: [{ inst: 'lead', notes: [15, h, h, 14, h, h, 12, h, 10, h, h, h, 7, h, h, h, 15, h, h, 17, h, h, 19, h, 18, h, h, h, h, h, _, _] }] },
+  prison: { bpm: 118, key: N('C#'), bars: [['C#', 1], ['A', 0], ['F#', 1], ['G#', 0]], pad: 0.6, bass: 'pulse',
+    lv: { metal: 0, arp: 0, kit: 1, mel: 2, choir: 3 }, metal: 'm.....m...m.....', choir: true,
+    arp: { pat: [0, _, 1, _, 2, _, 1, _, 0, _, 1, _, 3, _, 2, _], inst: 'sq', every: 1 }, kit: { k: 'K.......K..K....', h: '..h...h...h...hh' },
+    mels: [{ inst: 'brass', notes: [12, h, h, h, 11, h, h, h, 12, h, 15, h, 14, h, h, h, 12, h, h, h, 9, h, h, h, 11, h, h, h, h, h, h, h] }] },
+  rift: { bpm: 140, key: N('D'), bars: [['D', 0], ['E', 0], ['B', 1], ['G', 0], ['D', 0], ['E', 0], ['F#', 1], ['A', 0]], pad: 1,
+    lv: { arp: 0, choir: 0, taiko: 1, ost: 2, mel: 1 }, choir: true, taiko: 'T.tT..tTT.tT.ttt',
+    arp: { pat: [0, 2, 3, 4, 5, 4, 3, 2, 0, 2, 3, 4, 5, 4, 3, 1], inst: 'sq', every: 1 }, ost: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 2, 12, 4, 12],
+    mels: [{ inst: 'lead', notes: [16, h, 18, h, 21, h, h, h, 23, h, 21, h, 18, h, h, h, 16, h, 18, h, 21, h, 23, h, 25, h, h, h, h, h, h, h] },
+      { inst: 'brass', lv: 3, notes: [16, h, h, h, h, h, h, h, 14, h, h, h, h, h, h, h, 11, h, h, h, h, h, h, h, 13, h, h, h, h, h, h, h] }] },
   boss: { bpm: 150, key: N('D'), bars: [['D', 1], ['Eb', 0], ['D', 1], ['Eb', 0], ['Bb', 0], ['A', 0], ['D', 1], ['A', 0]],
     ost: [0, 12, 0, 13, 0, 12, 0, 7, 0, 12, 0, 13, 0, 15, 13, 12], choir: true, taiko: 'T.tTT.t.T.tTTttt', rim: '..r...r...r...rr', kit: { k: 'K.......K.K.....' },
     mels: [{ inst: 'brass', notes: [12, h, 13, h, 12, h, h, h, 13, h, 15, h, 13, h, h, h, 10, h, 12, h, 13, h, 15, h, 16, h, h, h, h, h, h, h] }] },
@@ -87,7 +106,7 @@ const SCORES = (() => { const _ = null, h = HOLD; return {
 }; })();
 SCORES.stage = SCORES.sea;
 // themes whose layers follow the fight
-const ADAPTIVE = new Set(['sea', 'stage', 'stealth', 'chase', 'jungle', 'swamp', 'rock', 'village', 'fortress', 'lab']);
+const ADAPTIVE = new Set(['sea', 'stage', 'stealth', 'chase', 'jungle', 'swamp', 'rock', 'village', 'fortress', 'lab', 'ambush', 'storm', 'prison', 'rift']);
 
 const Music = {
   name: '', score: null, step: 0, next: 0, transpose: 0, bus: null, verb: null, level: 2, want: 2,

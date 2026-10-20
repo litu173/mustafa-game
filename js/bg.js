@@ -436,6 +436,13 @@ function swampMotes(c, cam, t) {
    waterfalls, mist, searchlights, smoke, birds. Weather and time of day
    (rain, storm, fog, embers, fireflies / night, dusk, alarm) come from the mission.
    ========================================================= */
+// The walkable floor in each painting (screen y of the feet), so nobody walks on walls, ledges or sky
+const FLOOR = { sea: [448, 630], village: [468, 700], jungle: [480, 696], fortress: [478, 704], swamp: [470, 702], garage: [452, 704], lab: [462, 704], road: [482, 702] };
+function setFloor(theme) {
+  const f = FLOOR[theme] || [482, 702];
+  BELT_TOP = f[0]; BELT_BOT = f[1];
+  for (const p of G.props) p.y = clamp(p.y, BELT_TOP + 8, BELT_BOT - 8);
+}
 // where the far scenery ends and the walkable floor begins (fraction of image height), per painting
 const BG_CUT = { sea: 0.49, village: 0.48, jungle: 0.54, fortress: 0.515, swamp: 0.5, garage: 0.5, lab: 0.52, road: 0.56 };
 const BG_FAR = 0.55;   // far layer moves at 55% of the camera speed

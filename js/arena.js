@@ -45,6 +45,8 @@ function startArena(msg) {
     return f;
   });
   G.enemies = []; G.items = []; G.props = []; G.projs = []; G.parts = []; G.texts = [];
+  setFloor(ARENAS[msg.stage % ARENAS.length].theme);
+  for (const f of G.players) f.y = clamp(f.y, BELT_TOP + 10, BELT_BOT - 10);
   G.stageIdx = msg.stage; G.camX = clamp((myFighter() || G.players[0]).x - W / 2, 0, ARENA_W - W);
   G.camLock = null; G.waveIdx = 0; G.queue = []; G.boss = null; G.drive = null;
   G.combo = 0; G.comboT = 0; G.focus = null; G.banner = { title: 'FIGHT!', sub: modeLabel(), t: 0, dur: 110, big: true };

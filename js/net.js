@@ -98,7 +98,12 @@ const Net = {
     Input.locked = true; Input.clear();
     this.connect(); this.render();
   },
-  hideHub() { this.open = false; this.el.classList.add('hidden'); Input.locked = false; Input.clear(); },
+  hideHub() {
+    this.open = false; this.el.classList.add('hidden'); Input.locked = false; Input.clear();
+    // hand the keyboard back to the game: a focused lobby button would otherwise swallow every key
+    if (document.activeElement && this.el.contains(document.activeElement)) document.activeElement.blur();
+    const cv = document.getElementById('game'); if (cv) cv.focus({ preventScroll: true });
+  },
   closeHub() { if (this.room) this.send({ t: 'roomLeave' }); this.hideHub(); },
   toast(text) {
     const box = document.getElementById('toasts'); if (!box) return;
@@ -111,6 +116,7 @@ const Net = {
     this.el.addEventListener('click', e => this.onClick(e));
     this.el.addEventListener('change', e => this.onChange(e));
     this.el.addEventListener('keydown', e => {
+      if (!this.open) return;            // hub hidden: keys belong to the game
       e.stopPropagation();
       const id = e.target.id;
       if (e.key === 'Escape') { e.preventDefault(); this.closeHub(); }
@@ -159,7 +165,7 @@ const Net = {
     const s = this.social, reqCount = s.requests.length + s.teamInvites.length;
     const head = `<header>
         <button class="back" data-act="back" aria-label="Back">◀</button>
-        <div class="brand"><img src="assets/logo.png?v=1" alt="Mustafa Reborn"><span class="sub">ONLINE ARENA</span></div>
+        <div class="brand"><img src="assets/logo.png?v=2" alt="Mustafa Reborn"><span class="sub">ONLINE ARENA</span></div>
         <span class="status ${this.status}"><i></i>${statusTxt}</span>
         ${this.status === 'offline' ? '<button class="btn sm" data-act="reconnect">Retry</button>' : ''}
         <label class="chan"># <select id="chanSelect">${(this.channels.length ? this.channels : [{ name: this.channel || 'Global', count: 0 }]).map(c => `<option value="${esc(c.name)}" ${c.name === this.channel ? 'selected' : ''}>${esc(c.name)} (${c.count})</option>`).join('')}${this.channel && !this.channels.some(c => c.name === this.channel) ? `<option selected>${esc(this.channel)}</option>` : ''}</select></label>
