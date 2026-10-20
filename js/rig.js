@@ -128,14 +128,19 @@ function drawRig(c, f, x, y, face, o = {}) {
   // back limbs, torso, front leg, head, front arm
   draw('upperB', sB, P.uB); draw('foreB', elB, P.uB + P.fB);
   draw('thighB', hipB, P.tB); draw('shinB', kneeB, P.tB + P.sB);
-  draw('torso', [0, 0], P.lean, tor.j.hip);
-  draw('thighF', hipF, P.tF); draw('shinF', kneeF, P.tF + P.sF);
-  if (R.head) {
-    const hd = R.head, hs = (torsoLen * 0.62) / hd.h * tune.head;
-    c.save(); c.translate(neck[0], neck[1] + tune.neckDy); c.rotate(P.lean * 0.5 + P.head); c.scale(hs, hs);
+  // the painted side heads carry a full neck: draw them before the torso so the shirt collar
+  // overlaps the base of the neck; the older cover cut-outs sit on top instead
+  const side = R.head && R.head.j.chin;
+  const drawHead = () => {
+    const hd = R.head, hs = side ? (torsoLen * 0.5) / hd.j.chin[1] * tune.head : (torsoLen * 0.62) / hd.h * tune.head;
+    c.save(); c.translate(neck[0], neck[1] + (side ? tune.neckDy * 0.5 : tune.neckDy)); c.rotate(P.lean * 0.5 + P.head); c.scale(hs, hs);
     c.drawImage(img, hd.x, hd.y, hd.w, hd.h, -hd.j.neck[0], -hd.j.neck[1], hd.w, hd.h);
     c.restore();
-  }
+  };
+  if (side) drawHead();
+  draw('torso', [0, 0], P.lean, tor.j.hip);
+  draw('thighF', hipF, P.tF); draw('shinF', kneeF, P.tF + P.sF);
+  if (R.head && !side) drawHead();
   draw('upperF', sF, P.uF); draw('foreF', elF, P.uF + P.fF);
   // a held weapon sits in the front fist
   if (f.weapon && typeof drawItemSpr === 'function' && (GUNS[f.weapon] || MELEE_W[f.weapon])) {

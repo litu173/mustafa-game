@@ -5,7 +5,7 @@
    Every frame faces right; (ax, ay) is the foot anchor inside the frame.
    The code-drawn art in art.js stays as a fallback while images load.
    ========================================================= */
-const SPRITE_V = 'hd6';   // bump when the art is regenerated, so browsers fetch the new sheets
+const SPRITE_V = 'hd8';   // bump when the art is regenerated, so browsers fetch the new sheets
 const SPR = { img: {}, flash: {}, tint: {}, head: {}, bg: {}, cover: null, loaded: 0, total: 0 };
 
 // sheet names + on-screen height of the reference frame (ref: 0 = stance, 1 = walk)

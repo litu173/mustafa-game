@@ -249,7 +249,7 @@ function nearOwn(lab, ids, w, h, x, y) {
   return false;
 }
 
-module.exports = { readPNG, writePNG, keyMagenta, components };
+module.exports = { readPNG, writePNG, keyMagenta, components, despill };
 if (require.main === module) {
 fs.mkdirSync(OUT, { recursive: true });
 const atlas = {};
