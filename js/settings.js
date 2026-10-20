@@ -36,6 +36,7 @@ function updSettings() {
   if (!m.down && S.drag >= 0) { S.drag = -1; Save.write(); }
   for (const R of G.rects) {
     const inside = m.x >= R.x && m.x <= R.x + R.w && m.y >= R.y && m.y <= R.y + R.h;
+    if (inside && m.moved && S.drag < 0 && typeof R.i === 'number' && S.sel !== R.i) { S.sel = R.i; Sound.play('select'); }
     if (!m.click || !inside) continue;
     if (R.i === 'close') return closeSettings();
     S.sel = R.i;

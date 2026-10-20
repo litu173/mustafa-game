@@ -1461,6 +1461,22 @@ function render() {
       if (G.paused) drawPause(ctx);
   }
   if (G.settings) drawSettings(ctx);
+  drawHover(ctx);
+}
+// Mouse feedback for every on-screen button: hand cursor, and a soft gold glow on
+// buttons that have no hover state of their own (✕, BACK, SKIP, GO...).
+let lastCursor = '';
+function drawHover(c) {
+  const m = Input.mouse, R = !TOUCH && m.x >= 0 && !Input.locked ? uiHit(m.x, m.y) : null;
+  const cur = R ? 'pointer' : 'default';
+  if (cur !== lastCursor) { cvs.style.cursor = cur; lastCursor = cur; }
+  if (!R || typeof R.i === 'number') return;   // list items already light up when hovered
+  c.save();
+  c.shadowColor = 'rgba(255,214,90,0.9)'; c.shadowBlur = 18 + Math.sin(G.t * 0.15) * 6;
+  c.strokeStyle = 'rgba(255,230,150,0.85)'; c.lineWidth = 2.5;
+  if (Math.abs(R.w - R.h) < 4) { c.beginPath(); c.arc(R.x + R.w / 2, R.y + R.h / 2, R.w / 2 - 4, 0, TAU); c.stroke(); }
+  else { rrect(c, R.x - 3, R.y - 3, R.w + 6, R.h + 6, Math.min(28, R.h / 2 + 3)); c.stroke(); }
+  c.restore();
 }
 
 /* ---------- main loop (fixed 60 Hz simulation) ---------- */

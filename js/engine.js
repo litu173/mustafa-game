@@ -108,7 +108,25 @@ function trackMouse(e) {
   Input.mouse.moved = true;
 }
 cvs.addEventListener('pointermove', trackMouse);
-cvs.addEventListener('pointerdown', e => { Sound.init(); trackMouse(e); Input.mouse.down = true; if (!Input.locked) Input.mouse.click = true; });
+cvs.addEventListener('pointerdown', e => {
+  Sound.init(); trackMouse(e); Input.mouse.down = true;
+  if (Input.locked) return;
+  Input.mouse.click = true;
+  if (uiHit(Input.mouse.x, Input.mouse.y)) Sound.play('click');   // every on-screen button clicks
+});
+// which on-screen button (if any) is under a point; screens list theirs in G.rects while drawing
+function uiHit(x, y) {
+  const rs = typeof G !== 'undefined' && G.rects;
+  return rs ? rs.find(R => x >= R.x && x <= R.x + R.w && y >= R.y && y <= R.y + R.h) || null : null;
+}
+// HTML buttons (lobby, Royal Pass, chat...) click too; the in-game touch pad stays silent
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest && e.target.closest('button, .plan, a, [role="button"]');
+  if (b && !b.closest('#pad') && !b.disabled) { Sound.init(); Sound.play('click'); }
+}, true);
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('button') && !e.target.closest('#pad')) Sound.play('click');
+}, true);
 for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, () => { Input.mouse.down = false; });
 // mouse wheel / trackpad, in canvas pixels (read and cleared by scrollable screens)
 cvs.addEventListener('wheel', ev => { const r = cvs.getBoundingClientRect(); Input.wheel = (Input.wheel || 0) + ev.deltaY * (ev.deltaMode === 1 ? 40 : 1) * H / r.height; ev.preventDefault(); }, { passive: false });
@@ -201,6 +219,7 @@ const Sound = {
       case 'break': this.noise(0.28, 0.7, 'bandpass', 1300, 250); this.osc('triangle', 300, 90, 0.15, 0.2); break;
       case 'hurt': this.osc('square', 320 * v, 120, 0.15, 0.1); this.noise(0.08, 0.3, 'lowpass', 1200, 300); break;
       case 'tick': this.osc('square', 1400, 0, 0.03, 0.05); break;
+      case 'click': this.noise(0.018, 0.3, 'highpass', 3200, 2200); this.osc('square', 1900, 1300, 0.025, 0.05); break;
       case 'go': this.arp([784, 1047], 0.08, 'square', 0.08); Music.stinger('wave'); break;
       case 'fanfare': this.arp([523, 659, 784, 1047, 784, 1047, 1319], 0.11, 'square', 0.1); break;
       case 'over': this.arp([392, 330, 262, 196], 0.22, 'triangle', 0.2); Music.stinger('fail'); break;

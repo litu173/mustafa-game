@@ -3,6 +3,8 @@
    MUSTAFA — online client: connection + the Online Hub
    (quick play, live fight cards, VS room, friends, teams, chat).
    ========================================================= */
+// identifies a lobby button across redraws (same action, same target)
+const btnKey = b => ['act', 'mode', 'tab', 'i', 'id', 'hero', 'room'].map(k => b.dataset[k] || '').join('|') + '|' + b.className;
 const HERO_NAMES = { mustafa: 'Mustafa', rakib: 'Robin', nadia: 'Nova', bablu: 'Roy' };
 const HERO_ROLE = { mustafa: 'The Hunter', rakib: 'The Mechanic', nadia: 'The Storm', bablu: 'The Bulldozer' };
 const MODE_INFO = {
@@ -97,12 +99,36 @@ const Net = {
     this.open = true; this.el.classList.remove('hidden');
     Input.locked = true; Input.clear();
     this.connect(); this.render();
+    setTimeout(() => { if (this.open) this.focusFirst(); }, 60);
   },
   hideHub() {
     this.open = false; this.el.classList.add('hidden'); Input.locked = false; Input.clear();
     // hand the keyboard back to the game: a focused lobby button would otherwise swallow every key
     if (document.activeElement && this.el.contains(document.activeElement)) document.activeElement.blur();
     const cv = document.getElementById('game'); if (cv) cv.focus({ preventScroll: true });
+  },
+  // keyboard: arrows jump to the nearest button in that direction
+  moveFocus(key) {
+    const all = [...this.el.querySelectorAll('button, input, select, [tabindex="0"]')].filter(b => !b.disabled && b.offsetParent);
+    if (!all.length) return;
+    const cur = document.activeElement;
+    if (!all.includes(cur)) return all[0].focus();
+    const r0 = cur.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+    const dir = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[key];
+    let best = null, bestD = 1e9;
+    for (const b of all) {
+      if (b === cur) continue;
+      const r = b.getBoundingClientRect(), dx = r.left + r.width / 2 - cx, dy = r.top + r.height / 2 - cy;
+      const along = dx * dir[0] + dy * dir[1], across = Math.abs(dx * dir[1]) + Math.abs(dy * dir[0]);
+      if (along <= 4) continue;
+      const d = along + across * 2.5;
+      if (d < bestD) { bestD = d; best = b; }
+    }
+    if (best) { best.focus(); Sound.play('select'); }
+  },
+  focusFirst() {
+    const b = ['.findbtn', 'button.btn', 'button'].map(q => [...this.el.querySelectorAll(q)].find(x => !x.disabled && x.offsetParent)).find(Boolean);
+    if (b) b.focus({ preventScroll: true });
   },
   closeHub() { if (this.room) this.send({ t: 'roomLeave' }); this.hideHub(); },
   toast(text) {
@@ -120,6 +146,7 @@ const Net = {
       e.stopPropagation();
       const id = e.target.id;
       if (e.key === 'Escape') { e.preventDefault(); this.closeHub(); }
+      if (e.key.startsWith('Arrow') && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); this.moveFocus(e.key); return; }
       if (e.key !== 'Enter') return;
       if (id === 'chatInput') { e.preventDefault(); this.sendChat(); }
       if (id === 'nameInput') { e.preventDefault(); e.target.blur(); }
@@ -161,6 +188,7 @@ const Net = {
     const keep = {};
     for (const inp of this.el.querySelectorAll('input')) keep[inp.id] = inp.value;
     const focused = document.activeElement && document.activeElement.id;
+    const ae = document.activeElement, focusKey = ae && ae.tagName === 'BUTTON' && this.el.contains(ae) ? btnKey(ae) : null;
     const statusTxt = { online: 'ONLINE', connecting: 'CONNECTING…', offline: 'OFFLINE' }[this.status];
     const s = this.social, reqCount = s.requests.length + s.teamInvites.length;
     const head = `<header>
@@ -187,6 +215,10 @@ const Net = {
     if (this.chatOpen) this.unread = 0;
     for (const [id, v] of Object.entries(keep)) { const inp = document.getElementById(id); if (inp && id !== 'nameInput') inp.value = v; }
     if (focused) { const f = document.getElementById(focused); if (f) f.focus(); }
+    else if (focusKey) {   // the lobby redraws itself often: keep keyboard focus on the same button
+      const f = [...this.el.querySelectorAll('button')].find(b => btnKey(b) === focusKey);
+      if (f) f.focus({ preventScroll: true });
+    }
     const msgs = document.getElementById('msgs'); if (msgs) msgs.scrollTop = msgs.scrollHeight;
     this.paint();
   },
