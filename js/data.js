@@ -14,7 +14,7 @@ const HEROES = [
     royal: { cap: '#151515', shirt: '#1d1d22', pants: '#d4af37', boots: '#121212', belt: '#d4af37', sash: '#d4af37' },
   },
   {
-    id: 'rakib', name: 'BOLT', title: 'The Mechanic', hp: 100, speed: 4.8, power: 1.0, finisher: 'kick',
+    id: 'rakib', name: 'ROBIN', title: 'The Mechanic', hp: 100, speed: 4.8, power: 1.0, finisher: 'kick',
     desc: 'Ace mechanic and street brawler. Builds anything, breaks anyone. Finishes with a flying kick.', stats: [4, 4, 4],
     look: { skin: '#d49b6c', hair: '#1b1410', hairStyle: 'slick', shirt: '#efebe0', top: 'dress', sleeves: 'rolled',
             pants: '#262a36', boots: '#2a1c12', belt: '#3a2414', holster: '#5a3517' },
@@ -28,7 +28,7 @@ const HEROES = [
     royal: { shirt: '#161616', pants: '#f5efe0', boots: '#d4af37', belt: '#d4af37', sash: '#d4af37' },
   },
   {
-    id: 'bablu', name: 'TITAN', title: 'The Bulldozer', hp: 118, speed: 4.0, power: 1.4, finisher: 'slam',
+    id: 'bablu', name: 'ROY', title: 'The Bulldozer', hp: 118, speed: 4.0, power: 1.4, finisher: 'slam',
     desc: 'A walking wall. Slow, but his ground slam shakes the earth.', stats: [5, 2, 3],
     look: { build: 1.3, scale: 1.06, skin: '#c78a5c', hair: '#15100c', hairStyle: 'flattop', shirt: '#e8681c', top: 'tee', sleeves: 'short',
             pants: '#6e9a58', boots: '#3a2a1a', belt: '#4a2d16' },
@@ -240,8 +240,8 @@ const STAGES = [
   },
   {
     id: 'm5', chapter: 1, name: 'BLACK WATER', sub: 'An ambush in the glowing swamp', theme: 'swamp', look: 'dusk', weather: 'fog', water: true, transpose: 2, len: 4500, maxOn: 5, music: 'ambush',
-    obj: { type: 'survive', text: 'Survive the ambush until Bolt brings the boat' },
-    brief: 'Following the poachers into the swamp was a trap, and the water glows green with leaked serum. Hold the line until Bolt arrives with the boat.',
+    obj: { type: 'survive', text: 'Survive the ambush until Robin brings the boat' },
+    brief: 'Following the poachers into the swamp was a trap, and the water glows green with leaked serum. Hold the line until Robin arrives with the boat.',
     waves: [
       { at: 500, list: ['poacher', 'razor', 'razor', 'lash'] },
       { at: 1400, list: ['razorX', 'poacher', 'lash', 'motka'] },

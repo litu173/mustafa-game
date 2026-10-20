@@ -12,7 +12,7 @@ const STORY = {
     { bg: 'jungle', text: 'Its energy brought the dinosaurs back. In the hidden valley they nest in peace, guarded by the people of Shobuj Village and their elder, Dada Hakim.' },
     { bg: 'lab', who: 'kaiser', name: 'DR. KAISER', text: 'The Chrono-Fang can tear open time itself. Dinosaur blood, cyber-implants and that crystal... and I will rule every age that ever was.' },
     { bg: 'village', text: 'Last night the Black Fang burned Shobuj Village and kidnapped Dada Hakim. Only he knows the way to the crystal’s heart.' },
-    { bg: 'garage', who: 'mustafa', name: 'MUSTAFA', text: 'They took the old man. Bolt, fire up the Cadillac. Nova, Titan... we ride at dawn.' },
+    { bg: 'garage', who: 'mustafa', name: 'MUSTAFA', text: 'They took the old man. Robin, fire up the Cadillac. Nova, Roy... we ride at dawn.' },
     { bg: 'cover', title: 'OPERATION REBORN', text: '14 missions in 5 chapters. Rescue Dada Hakim. Stop Dr. Kaiser before he breaks time itself.' },
   ],
   chapter1: [

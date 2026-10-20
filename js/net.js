@@ -3,7 +3,7 @@
    MUSTAFA — online client: connection + the Online Hub
    (quick play, live fight cards, VS room, friends, teams, chat).
    ========================================================= */
-const HERO_NAMES = { mustafa: 'Mustafa', rakib: 'Bolt', nadia: 'Nova', bablu: 'Titan' };
+const HERO_NAMES = { mustafa: 'Mustafa', rakib: 'Robin', nadia: 'Nova', bablu: 'Roy' };
 const HERO_ROLE = { mustafa: 'The Hunter', rakib: 'The Mechanic', nadia: 'The Storm', bablu: 'The Bulldozer' };
 const MODE_INFO = {
   duel: { title: 'Quick Duel', short: 'DUEL', sub: '1 vs 1 · starts as soon as an opponent joins', icon: '⚔' },
