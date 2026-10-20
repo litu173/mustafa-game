@@ -5,7 +5,7 @@
    Every frame faces right; (ax, ay) is the foot anchor inside the frame.
    The code-drawn art in art.js stays as a fallback while images load.
    ========================================================= */
-const SPRITE_V = 'hd3';   // bump when the art is regenerated, so browsers fetch the new sheets
+const SPRITE_V = 'hd4';   // bump when the art is regenerated, so browsers fetch the new sheets
 const SPR = { img: {}, flash: {}, tint: {}, head: {}, bg: {}, cover: null, loaded: 0, total: 0 };
 
 // sheet names + on-screen height of the reference frame (ref: 0 = stance, 1 = walk)
@@ -43,8 +43,9 @@ function loadSprites() {
   for (const name of Object.keys(atlas)) {
     const im = new Image(); SPR.total++;
     im.onload = () => { SPR.img[name] = im; SPR.flash[name] = tinted(im, '#fff6e0', 1); findHead(name, im); if (name === 'ptera_f') alignByCrest(name, im); SPR.loaded++; };
-    im.onerror = () => { SPR.total--; };
-    im.src = 'assets/sprites/' + name + '.png?v=' + SPRITE_V;
+    im.onerror = () => { if (im.src.includes('.webp')) { im.src = 'assets/sprites/' + name + '.png?v=' + SPRITE_V; return; } SPR.total--; };
+    // WebP is ~7x lighter than PNG; fall back to PNG on the rare browser that cannot decode it
+    im.src = 'assets/sprites/' + name + '.webp?v=' + SPRITE_V;
   }
   for (const t of ['sea', 'swamp', 'road', 'garage', 'village', 'lab', 'jungle', 'fortress', 'cover']) {
     const im = new Image(); SPR.total++;
