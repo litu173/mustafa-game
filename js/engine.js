@@ -110,6 +110,8 @@ function trackMouse(e) {
 cvs.addEventListener('pointermove', trackMouse);
 cvs.addEventListener('pointerdown', e => { Sound.init(); trackMouse(e); Input.mouse.down = true; if (!Input.locked) Input.mouse.click = true; });
 for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, () => { Input.mouse.down = false; });
+// mouse wheel / trackpad, in canvas pixels (read and cleared by scrollable screens)
+cvs.addEventListener('wheel', ev => { const r = cvs.getBoundingClientRect(); Input.wheel = (Input.wheel || 0) + ev.deltaY * (ev.deltaMode === 1 ? 40 : 1) * H / r.height; ev.preventDefault(); }, { passive: false });
 // iOS only unlocks WebAudio from a touchend/click, not from pointerdown
 for (const ev of ['touchend', 'click']) addEventListener(ev, () => Sound.init(), { passive: true });
 

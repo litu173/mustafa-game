@@ -1009,7 +1009,7 @@ function menuInput(n, key, horizontal) {
 function titleItems() {
   const m = Save.d.mission || 0;
   return [
-    { id: 'start', label: 'START', sub: m > 0 ? 'CONTINUE · MISSION ' + (m + 1) + ': ' + STAGES[m].name : 'NEW CAMPAIGN · 12 MISSIONS' },
+    { id: 'start', label: 'START', sub: m > 0 ? 'CONTINUE · MISSION ' + (m + 1) + ': ' + STAGES[m].name : 'NEW CAMPAIGN · ' + STAGES.length + ' MISSIONS' },
     { id: 'stages', label: '▦  MISSIONS' },
     { id: 'online', label: '⚔  ONLINE BATTLE' },
     { id: 'royal', label: Save.d.premium ? '♛  ROYAL PASS ✓' : '♛  ROYAL PASS' },
@@ -1026,10 +1026,29 @@ function updTitle() {
     return;
   }
   if (G.overlay === 'stages') {
-    const ch = menuInput(STAGES.length, 'stageSel', true);
-    if (Input.hit('up')) G.stageSel = (G.stageSel + STAGES.length - 4) % STAGES.length;
-    if (Input.hit('down')) G.stageSel = (G.stageSel + 4) % STAGES.length;
     if (Input.hit('back') || tapped('close')) { G.overlay = null; Sound.play('select'); return; }
+    // the list scrolls: wheel, drag (touch or mouse), and keyboard focus keeps the pick in view
+    const L = stageLayout(), m = Input.mouse, inList = m.y > L.top && m.y < L.bottom;
+    let tap = false;
+    if (m.click && inList) G.stageDrag = { y: m.y, s: G.stageScrollT, moved: false };
+    if (G.stageDrag) {
+      if (m.down) { const dy = m.y - G.stageDrag.y; if (Math.abs(dy) > 10) G.stageDrag.moved = true; if (G.stageDrag.moved) G.stageScrollT = G.stageDrag.s - dy; }
+      else { tap = !G.stageDrag.moved; G.stageDrag = null; }
+    }
+    if (Input.wheel) { G.stageScrollT += Input.wheel; Input.wheel = 0; }
+    const before = G.stageSel, click = m.click; m.click = false;          // a press only picks a mission once it is released without dragging
+    if (tap) m.click = true;
+    const ch = menuInput(STAGES.length, 'stageSel', true);
+    m.click = click && !inList;
+    if (Input.hit('up')) G.stageSel = (G.stageSel + STAGES.length - L.cols) % STAGES.length;
+    if (Input.hit('down')) G.stageSel = (G.stageSel + L.cols) % STAGES.length;
+    if (G.stageSel !== before && !G.stageDrag && !m.moved) {
+      const y = Math.floor(G.stageSel / L.cols) * L.rowH;
+      if (y < G.stageScrollT) G.stageScrollT = y;
+      if (y + L.chh > G.stageScrollT + L.bottom - L.top) G.stageScrollT = y + L.chh - (L.bottom - L.top);
+    }
+    G.stageScrollT = clamp(G.stageScrollT, 0, L.max);
+    G.stageScroll += (G.stageScrollT - G.stageScroll) * (G.stageDrag ? 1 : 0.25);
     if (ch >= 0) {
       if (ch > (Save.d.premium ? 99 : Save.d.mission || 0)) { Sound.play('denied'); openRoyal(); return; }
       G.startStage = ch; G.overlay = null; G.campaign = true; goSelect();
@@ -1049,7 +1068,11 @@ function updTitle() {
     case 'start': campaignNew(); break;
     case 'diff': Save.d.diff = ((Save.d.diff ?? 1) + 1) % DIFFS.length; Save.write(); break;
     case 'online': Net.openHub(); break;
-    case 'stages': G.overlay = 'stages'; G.stageSel = Math.min(Save.d.mission || 0, STAGES.length - 1); break;
+    case 'stages': {
+      G.overlay = 'stages'; G.stageSel = Math.min(Save.d.mission || 0, STAGES.length - 1); G.stageDrag = null; Input.wheel = 0;
+      const L = stageLayout(); G.stageScroll = G.stageScrollT = clamp(Math.floor(G.stageSel / L.cols) * L.rowH - L.rowH, 0, L.max);
+      break;
+    }
     case 'royal': openRoyal(); break;
     case 'help': G.overlay = 'help'; break;
     case 'settings': openSettings('title'); break;
@@ -1301,6 +1324,13 @@ function drawFighterSprite(f, spr, sx, sy, flash) {
   else if (f.state === 'taunt') { breathe = 1 + 0.03 * Math.abs(Math.sin(f.t * 0.2)); rot = Math.sin(f.t * 0.3) * 0.03; }
   const bx = sx + push;
   // cross-fade: the previous pose lingers faintly for a few frames so pose changes never pop
+  if (spr.rig) {   // heroes: cut-out puppet with the cover face
+    const amb = AMBIENT[stageDef().look || stageDef().theme] || '';
+    if (amb) ctx.filter = amb;
+    drawRig(ctx, f, bx, sy + bob * 0.3, face, { flash });
+    if (amb) ctx.filter = 'none';
+    return;
+  }
   const key = spr.sheet + ':' + spr.idx;
   if (f.sprKey !== key) { f.sprPrev = f.sprCur; f.sprCur = spr; f.sprKey = key; f.sprT = 0; }
   f.sprT = (f.sprT || 0) + 1;
@@ -1460,5 +1490,6 @@ function frame(now) {
 })();
 Royal.init();
 Net.init();
-loadSprites();
+loadSprites(); loadRigs();
+setTimeout(() => loadStoryArt('prologue'), 4000);   // fetch the opening story art quietly after the loader
 requestAnimationFrame(frame);

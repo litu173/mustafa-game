@@ -5,7 +5,7 @@
    Every frame faces right; (ax, ay) is the foot anchor inside the frame.
    The code-drawn art in art.js stays as a fallback while images load.
    ========================================================= */
-const SPRITE_V = 'hd4';   // bump when the art is regenerated, so browsers fetch the new sheets
+const SPRITE_V = 'hd6';   // bump when the art is regenerated, so browsers fetch the new sheets
 const SPR = { img: {}, flash: {}, tint: {}, head: {}, bg: {}, cover: null, loaded: 0, total: 0 };
 
 // sheet names + on-screen height of the reference frame (ref: 0 = stance, 1 = walk)
@@ -277,6 +277,7 @@ function spriteFor(f) {
   const key = spriteKeyFor(f), d = SPRITE_DEFS[key];
   if (!d || !spritesReady(d.a) || (d.b && !spritesReady(d.b))) return null;
   trackMotion(f);
+  if ((f.team === 'hero' || f.hero) && typeof hasRig === 'function' && hasRig(key) && f.state !== 'drive') return { rig: true, k: 1 };
   const realState = f.state;
   if (f.visState && !f.def.flyer && key !== 'hog') f.state = f.visState;
   let r;

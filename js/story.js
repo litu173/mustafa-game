@@ -203,8 +203,22 @@ function afterClear() {
 }
 
 /* ---------- cutscenes ---------- */
+// Every story beat has its own painted scene (assets/story/<story>_<n>.webp). They load on
+// demand, so they never slow the first load; until one arrives the mission backdrop shows.
+const STORY_ART = {};
+function loadStoryArt(id) {
+  (STORY[id] || []).forEach((p, i) => {
+    if (p.bg === 'cover') return;
+    const key = id + '_' + (i + 1);
+    if (STORY_ART[key]) return;
+    const im = new Image(); STORY_ART[key] = im;
+    im.onload = () => { im.ready = true; };
+    im.src = 'assets/story/' + key + '.webp?v=1';
+  });
+}
 function playStory(id, done) {
-  G.story = { panels: STORY[id], i: 0, t: 0, chars: 0, done };
+  loadStoryArt(id);
+  G.story = { id, panels: STORY[id], i: 0, t: 0, chars: 0, done };
   G.scene = 'story'; G.sceneT = 0;
   Music.play('story');
 }
@@ -224,8 +238,9 @@ function updStory() {
 }
 function endStory() { const d = G.story.done; G.story = null; d && d(); }
 function bgImage(theme) { return theme === 'cover' ? SPR.cover : SPR.bg[theme]; }
-function drawKenBurns(c, theme, k, seed, look) {
-  const im = bgImage(theme);
+function drawKenBurns(c, theme, k, seed, look, art) {
+  const im = (art && art.ready) ? art : bgImage(theme);
+  if (im === art) look = null;   // the paintings are already lit for their moment
   c.fillStyle = '#050304'; c.fillRect(0, 0, W, H);
   if (!im) return;
   const z = 1.08 + k * 0.08, s = Math.max(W / im.width, H / im.height) * z;
@@ -237,7 +252,7 @@ function drawKenBurns(c, theme, k, seed, look) {
 function drawStory(c) {
   const s = G.story; if (!s) return;
   const p = s.panels[s.i], k = Math.min(1, s.t / 600);
-  drawKenBurns(c, p.bg, k, s.i, p.look);
+  drawKenBurns(c, p.bg, k, s.i, p.look, STORY_ART[s.id + '_' + (s.i + 1)]);
   const fade = Math.min(1, s.t / 25);
   c.fillStyle = `rgba(0,0,0,${1 - fade})`; c.fillRect(0, 0, W, H);
   // cinematic bars and a dark band for the text
@@ -325,14 +340,17 @@ function drawBrief(c) {
   txt(c, '◀  BACK', 100, 51, { font: '700 17px Cinzel, serif', align: 'center', fill: '#f3dc9a' });
 }
 // PUBG-style primary button: bright yellow, dark bold text
+// Gold action button. It is always fully lit (a dull button reads as "disabled");
+// the keyboard/controller focus shows as a pulsing glow and a bright outline instead.
 function bigButton(c, x, y, w, h, label, o = {}) {
-  const g = c.createLinearGradient(0, y, 0, y + h);
-  g.addColorStop(0, o.dim ? '#7a6a3a' : '#ffe680'); g.addColorStop(0.5, o.dim ? '#5a4a2a' : '#f5c518'); g.addColorStop(1, o.dim ? '#3a2e1a' : '#d79a00');
+  const focus = !o.dim, g = c.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, '#ffe680'); g.addColorStop(0.5, '#f5c518'); g.addColorStop(1, '#d79a00');
+  const path = () => { c.beginPath(); c.moveTo(x + 16, y); c.lineTo(x + w, y); c.lineTo(x + w - 16, y + h); c.lineTo(x, y + h); c.closePath(); };
   c.save();
-  c.shadowColor = 'rgba(245,197,24,0.45)'; c.shadowBlur = o.dim ? 0 : 24;
-  c.fillStyle = g; c.beginPath(); c.moveTo(x + 16, y); c.lineTo(x + w, y); c.lineTo(x + w - 16, y + h); c.lineTo(x, y + h); c.closePath(); c.fill();
+  c.shadowColor = 'rgba(245,197,24,0.55)'; c.shadowBlur = focus ? 22 + Math.sin(G.t * 0.12) * 8 : 10; c.shadowOffsetY = focus ? 0 : 3;
+  c.fillStyle = g; path(); c.fill();
   c.restore();
-  c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 2; c.stroke();
+  path(); c.strokeStyle = focus ? '#fff6d0' : 'rgba(255,255,255,0.55)'; c.lineWidth = focus ? 3 : 2; c.stroke();
   txt(c, label, x + w / 2, y + h / 2 + (o.size || 30) * 0.36, { font: `900 ${o.size || 30}px Cinzel, serif`, align: 'center', fill: '#1a1004' });
 }
 
@@ -358,15 +376,25 @@ function drawFailed(c) {
 }
 
 /* ---------- mission select (title menu) ---------- */
+// The grid scrolls between the title and the footer when it is taller than the screen.
+function stageLayout() {
+  const cols = 4, gap = 16, cw = (W - 120 - (cols - 1) * gap) / cols, chh = 150, rowH = chh + 26;
+  const top = 122, bottom = H - 72, rows = Math.ceil(STAGES.length / cols);
+  return { cols, gap, cw, chh, rowH, top, bottom, max: Math.max(0, rows * rowH - 26 - (bottom - top - 8)) };
+}
 function drawMissionSelect(c) {
   c.fillStyle = 'rgba(5,3,6,0.9)'; c.fillRect(0, 0, W, H);
   txt(c, 'MISSIONS', W / 2, 92, { font: '900 44px Cinzel, serif', align: 'center', fill: goldGrad(c, 60, 94), stroke: '#120800', sw: 6 });
   G.rects = [];
   const unlocked = Save.d.premium ? STAGES.length - 1 : (Save.d.mission || 0);
-  const cols = 4, cw = (W - 120 - (cols - 1) * 16) / cols, chh = 150;
+  const L = stageLayout(), { cols, cw, chh } = L, scroll = G.stageScroll || 0;
+  c.save(); c.beginPath(); c.rect(0, L.top, W, L.bottom - L.top); c.clip();
   STAGES.forEach((s, i) => {
-    const col = i % cols, row = Math.floor(i / cols), x = 60 + col * (cw + 16), y = 130 + row * (chh + 26), sel = G.stageSel === i, lock = i > unlocked;
-    G.rects.push({ x, y, w: cw, h: chh, i });
+    const col = i % cols, row = Math.floor(i / cols), x = 60 + col * (cw + L.gap), y = L.top + 8 + row * L.rowH - scroll, sel = G.stageSel === i, lock = i > unlocked;
+    if (y > L.bottom || y + chh < L.top) return;
+    // only the visible part of a card is clickable
+    const vy = Math.max(y, L.top), vh = Math.min(y + chh, L.bottom) - vy;
+    if (vh > 20) G.rects.push({ x, y: vy, w: cw, h: vh, i });
     c.save(); rrect(c, x, y, cw, chh, 12); c.clip();
     const im = bgImage(s.theme);
     if (im) { const sc = chh / im.height * 1.1; c.drawImage(im, (i * 137) % Math.max(1, im.width - cw / sc), 0, cw / sc, chh / sc, x, y, cw, chh); }
@@ -378,6 +406,18 @@ function drawMissionSelect(c) {
     txt(c, OBJ_ICON[s.obj.type] || '', x + cw - 16, y + 32, { font: '700 22px serif', align: 'right', fill: '#f3dc9a' });
     txt(c, lock ? '🔒  LOCKED' : s.name, x + cw / 2, y + chh - 18, { font: `900 ${s.name.length > 16 ? 14 : 16}px Cinzel, serif`, align: 'center', fill: lock ? '#8a7a5c' : sel ? '#f3cf6a' : '#e8dcc0', stroke: '#120800', sw: 4 });
   });
+  c.restore();
+  // soft edges + a scroll bar so it is obvious there is more below / above
+  if (L.max > 0) {
+    if (scroll > 4) { const g = c.createLinearGradient(0, L.top, 0, L.top + 36); g.addColorStop(0, 'rgba(5,3,6,0.95)'); g.addColorStop(1, 'rgba(5,3,6,0)'); c.fillStyle = g; c.fillRect(0, L.top, W, 36); }
+    if (scroll < L.max - 4) {
+      const g = c.createLinearGradient(0, L.bottom - 44, 0, L.bottom); g.addColorStop(0, 'rgba(5,3,6,0)'); g.addColorStop(1, 'rgba(5,3,6,0.95)'); c.fillStyle = g; c.fillRect(0, L.bottom - 44, W, 44);
+      txt(c, '▼', W / 2, L.bottom - 6 + Math.sin(G.t * 0.12) * 3, { font: '700 20px serif', align: 'center', fill: '#f3cf6a' });
+    }
+    const trackH = L.bottom - L.top - 16, viewH = L.bottom - L.top, thumbH = Math.max(40, trackH * viewH / (viewH + L.max)), ty = L.top + 8 + (trackH - thumbH) * (scroll / L.max);
+    c.fillStyle = 'rgba(212,175,55,0.18)'; rrect(c, W - 30, L.top + 8, 6, trackH, 3); c.fill();
+    c.fillStyle = '#d4af37'; rrect(c, W - 30, ty, 6, thumbH, 3); c.fill();
+  }
   G.rects.push({ x: W - 96 - SAFE.r, y: 18, w: 70, h: 70, i: 'close' }); closeX(c, W - 61 - SAFE.r, 53);
   txt(c, Save.d.premium ? 'Royal Pass: every mission unlocked' : 'Finish a mission to unlock the next  ·  Royal Pass unlocks all', W / 2, H - 40, { font: '600 16px Cinzel, serif', align: 'center', fill: '#bfae86' });
 }

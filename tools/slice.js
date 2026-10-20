@@ -249,6 +249,8 @@ function nearOwn(lab, ids, w, h, x, y) {
   return false;
 }
 
+module.exports = { readPNG, writePNG, keyMagenta, components };
+if (require.main === module) {
 fs.mkdirSync(OUT, { recursive: true });
 const atlas = {};
 for (const [name, count] of Object.entries(SHEETS)) {
@@ -267,3 +269,4 @@ console.log('size normalisation', norm);
 fs.writeFileSync(path.join(OUT, 'atlas.json'), JSON.stringify({ atlas, norm }));
 fs.writeFileSync(path.join(OUT, 'atlas.js'), 'window.ATLAS = ' + JSON.stringify(atlas) + ';\nwindow.ATLAS_NORM = ' + JSON.stringify(norm) + ';\n');
 console.log('wrote', Object.keys(atlas).length, 'atlases');
+}
