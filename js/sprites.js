@@ -5,7 +5,7 @@
    Every frame faces right; (ax, ay) is the foot anchor inside the frame.
    The code-drawn art in art.js stays as a fallback while images load.
    ========================================================= */
-const SPRITE_V = 'hd13';   // bump when the art is regenerated, so browsers fetch the new sheets
+const SPRITE_V = 'hd14';   // bump when the art is regenerated, so browsers fetch the new sheets
 const SPR = { img: {}, flash: {}, tint: {}, head: {}, bg: {}, cover: null, loaded: 0, total: 0 };
 
 // sheet names + on-screen height of the reference frame (ref: 0 = stance, 1 = walk)
@@ -36,7 +36,7 @@ const SPRITE_DEFS = {
 const ITEM_IDX = { pizza: 0, hotdog: 1, meat: 2, apple: 3, gem: 4, gold: 5, pistol: 6, rifle: 7, uzi: 8, shotgun: 9, bazooka: 10, grenade: 11, knife: 12, machete: 13, pipe: 14, rock: 15, crate: 16, barrel: 17 };
 
 function loadSprites() {
-  { const im = new Image(); SPR.total++; im.onload = () => { SPR.port = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/portraits.jpg?v=1'; }
+  { const im = new Image(); SPR.total++; im.onload = () => { SPR.port = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/portraits.jpg?v=2'; }
   // logo: small WebP first (the loading screen shows it), then the full-size one for big screens
   { const im = new Image(); SPR.total++; im.onload = () => { SPR.logoSm = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/logo-sm.webp?v=3'; }
   { const im = new Image(); SPR.total++; im.onload = () => { SPR.logo = im; SPR.loaded++; };
@@ -324,12 +324,13 @@ function drawCarSpr(c, x, y, damaged, flash, driver, passenger, o = {}) {
     if (o.pitch) { const px = left + fr.w * k * CAR_WHEELS[0].fx, py = top + fr.h * k * CAR_WHEELS[0].fy; c.translate(px, py); c.rotate(o.pitch); c.translate(-px, -py); }
     for (const [id, seat] of [[passenger, 'passenger'], [driver, 'driver']]) {
       if (!id) continue;
-      const sx = left + fr.w * k * CAR_SEATS[seat].fx, sy = top + fr.h * k * CAR_SEATS[seat].fy;
+      // seats are placed on the undamaged car's shape (the wrecked painting is taller: it has smoke on top)
+      const f0 = window.ATLAS.car_park[0], top0 = y - f0.ay * k, sx = x - f0.ax * k + f0.w * k * CAR_SEATS[seat].fx, sy = top0 + f0.h * k * CAR_SEATS[seat].fy;
       if (typeof hasRig === 'function' && hasRig(id)) {
         const f = CAR_CREW[seat + id] || (CAR_CREW[seat + id] = { def: HEROES.find(h => h.id === id) || { id }, id: seat === 'driver' ? 1 : 2, state: 'sit', seat, t: 0 });
         f.t++;
         // keep legs hidden even where the painted door is low: only draw above the car floor
-        c.save(); c.beginPath(); c.rect(sx - 200, top - 400, 400, fr.h * k * 0.74 + 400); c.clip();
+        c.save(); c.beginPath(); c.rect(sx - 200, top0 - 400, 400, f0.h * k * 0.74 + 400); c.clip();
         drawRig(c, f, sx, sy, 1, { flash, seat: true });
         c.restore();
       } else if (has(id + '_s')) {
@@ -338,7 +339,7 @@ function drawCarSpr(c, x, y, damaged, flash, driver, passenger, o = {}) {
         const sh = id + '_s', idx = seat === 'driver' ? 0 : 1, sf = window.ATLAS[sh][idx], d = SPRITE_DEFS[id];
         const kk = (d.h * SEAT_H) / sf.h, sway = Math.sin(G.t * 0.09 + (seat === 'driver' ? 0 : 1.7)) * 1.2;
         const hipX = sf.w * SEAT_HIP[0], hipY = sf.h * SEAT_HIP[1];
-        c.save(); c.beginPath(); c.rect(sx - 300, top - 400, 600, fr.h * k * 0.74 + 400); c.clip();
+        c.save(); c.beginPath(); c.rect(sx - 300, top0 - 400, 600, f0.h * k * 0.74 + 400); c.clip();
         drawSprite(c, sh, idx, sx + (sf.ax - hipX) * kk, sy + (sf.ay - hipY) * kk + sway, 1, kk, { flash });
         c.restore();
       } else {
@@ -346,7 +347,7 @@ function drawCarSpr(c, x, y, damaged, flash, driver, passenger, o = {}) {
         // figure's height above the boots) rest on the seat; the car body hides everything below
         const sh = id + '_a', d = SPRITE_DEFS[id]; if (!spritesReady(sh) || !d) continue;
         const sway = Math.sin(G.t * 0.09 + (seat === 'driver' ? 0 : 1.7)) * 1.2;
-        c.save(); c.beginPath(); c.rect(sx - 200, top - 400, 400, fr.h * k * 0.74 + 400); c.clip();
+        c.save(); c.beginPath(); c.rect(sx - 200, top0 - 400, 400, f0.h * k * 0.74 + 400); c.clip();
         drawSprite(c, sh, 0, sx, sy + d.h * 0.5 + sway, 1, spriteScale(id), { flash });
         c.restore();
       }

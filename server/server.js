@@ -231,7 +231,7 @@ const handlers = {
     if (t.members.length >= 8) return send(c, { t: 'toast', text: 'Teams can have up to 8 members.' });
     to.teamInvites = [...new Set([...(to.teamInvites || []), tid])]; save();
     pushSocial(m.to);
-    send(clients.get(m.to), { t: 'invite', kind: 'team', teamId: tid, name: c.name, team: t.name });
+    send(clients.get(m.to), { t: 'invite', kind: 'team', teamId: tid, name: c.name, hero: c.hero, team: t.name });
     send(c, { t: 'toast', text: `Team invite sent to ${userName(m.to)}.` });
   },
   teamAccept(c, m) {
@@ -257,7 +257,7 @@ const handlers = {
     if (to.room) return send(c, { t: 'toast', text: `${to.name} is busy right now.` });
     const r = createRoom(c, m.mode && MODES[m.mode] ? m.mode : 'duel', '', m.stage);
     joinRoom(c, r);
-    send(to, { t: 'invite', kind: 'room', roomId: r.id, name: c.name, label: MODES[r.mode].label });
+    send(to, { t: 'invite', kind: 'room', roomId: r.id, name: c.name, hero: c.hero, label: MODES[r.mode].label });
     send(c, { t: 'toast', text: `Challenge sent to ${to.name}.` });
   },
   // team captain (or any member) challenges another team: everyone online gets invited, sides fixed by team
@@ -269,7 +269,7 @@ const handlers = {
     for (const id of [...db.teams[mine].members, ...db.teams[theirs].members]) {
       if (id === c.id) continue;
       const o = clients.get(id);
-      if (o && !o.room) send(o, { t: 'invite', kind: 'room', roomId: r.id, name: c.name, label: r.name });
+      if (o && !o.room) send(o, { t: 'invite', kind: 'room', roomId: r.id, name: c.name, hero: c.hero, label: r.name });
     }
   },
   teamChallengeByMember(c, m) { const t = teamOf(m.member); if (t) handlers.teamChallenge(c, { teamId: t, stage: m.stage }); },

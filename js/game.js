@@ -399,9 +399,20 @@ function enemyGone(e) {
 }
 
 /* ---------- player ---------- */
+// half the on-screen width of the pose being drawn right now (a body lying flat is far wider than one standing)
+const LYING = ['fall', 'down', 'dead', 'getup'];
+function bodyHalf(f) {
+  const s = f.sprCur, fr = s && window.ATLAS && window.ATLAS[s.sheet] && window.ATLAS[s.sheet][s.idx];
+  return fr ? fr.w * s.k / 2 : (LYING.includes(f.state) ? 170 : 60);
+}
+// keep the whole body inside the screen, so nobody is ever cut in half by its edge
+function keepOnScreen(f) {
+  const m = Math.max(40, bodyHalf(f) * 1.1 + 10);
+  f.x = clamp(f.x, G.camX + m, G.camX + W - m);
+}
 function bound(p) {
   if (G.arena) return arenaBound(p);
-  p.x = clamp(p.x, G.camX + 40, G.camX + W - 40);
+  keepOnScreen(p);
   p.y = clamp(p.y, BELT_TOP, BELT_BOT);
 }
 function updatePlayer(p) {
@@ -592,6 +603,11 @@ function updateEnemy(e) {
 function boundE(e) {
   e.y = clamp(e.y, BELT_TOP, BELT_BOT);
   if (e.state !== 'enter' && !e.leaving) e.x = clamp(e.x, G.camX - 200, G.camX + W + 200);
+  // knocked down on screen: slide the body back so it lies fully in view
+  if (LYING.includes(e.state) && !e.leaving && !e.runner && e.x > G.camX - 120 && e.x < G.camX + W + 120) {
+    const m = bodyHalf(e) * 1.1 + 10, lo = G.camX + m, hi = G.camX + W - m;
+    if (e.x < lo) e.x = Math.min(lo, e.x + 14); else if (e.x > hi) e.x = Math.max(hi, e.x - 14);
+  }
 }
 function dinoWander(e) {
   if (e.leaving) {

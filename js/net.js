@@ -202,7 +202,7 @@ const Net = {
       <nav class="tabs">
         ${[['play', this.room ? '⚔ YOUR MATCH' : '⚔ PLAY'], ['friends', '♥ FRIENDS'], ['team', '⚑ TEAM']].map(([k, l]) => `<button class="tab ${this.tab === k ? 'sel' : ''}" data-act="tab" data-tab="${k}">${l}${k === 'friends' && reqCount ? `<b class="badge">${reqCount}</b>` : ''}</button>`).join('')}
       </nav>`;
-    const invites = this.invites.map((iv, i) => `<div class="invite">${this.avatar('mustafa', 28)}<span><b>${esc(iv.name)}</b> ${iv.kind === 'team' ? `invites you to team <b>${esc(iv.team)}</b>` : `challenges you to <b>${esc(iv.label)}</b>!`}</span>
+    const invites = this.invites.map((iv, i) => `<div class="invite">${this.avatar(iv.hero || 'mustafa', 28)}<span><b>${esc(iv.name)}</b> ${iv.kind === 'team' ? `invites you to team <b>${esc(iv.team)}</b>` : `challenges you to <b>${esc(iv.label)}</b>!`}</span>
       <button class="btn sm gold" data-act="inviteYes" data-i="${i}">Accept</button><button class="btn sm" data-act="inviteNo" data-i="${i}">Decline</button></div>`).join('');
     let main = '';
     if (this.tab === 'play') main = this.room ? this.roomView() : this.lobbyView();

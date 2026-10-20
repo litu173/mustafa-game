@@ -243,15 +243,16 @@ function drawKenBurns(c, theme, k, seed, look, art) {
   if (im === art) look = null;   // the paintings are already lit for their moment
   c.fillStyle = '#050304'; c.fillRect(0, 0, W, H);
   if (!im) return;
-  const z = 1.08 + k * 0.08, s = Math.max(W / im.width, H / im.height) * z;
+  // slow pull-back: start close on the painting and ease out to reveal the whole scene, drifting gently sideways
+  const e = 1 - Math.pow(1 - k, 2.2), z = 1.24 - 0.22 * e, s = Math.max(W / im.width, H / im.height) * z;
   const w = im.width * s, h = im.height * s, dir = seed % 2 ? 1 : -1;
-  const x = (W - w) / 2 + dir * (k - 0.5) * (w - W) * 0.8, y = (H - h) / 2 - (k - 0.5) * 20;
+  const x = (W - w) / 2 + dir * (0.5 - e) * (w - W) * 0.6, y = (H - h) / 2 + (0.5 - e) * (h - H) * 0.3;
   c.drawImage(im, x, y, w, h);
   if (look) gradeLook(c, look, G.t);
 }
 function drawStory(c) {
   const s = G.story; if (!s) return;
-  const p = s.panels[s.i], k = Math.min(1, s.t / 600);
+  const p = s.panels[s.i], k = Math.min(1, s.t / 900);   // ~15 s pull-back per panel
   drawKenBurns(c, p.bg, k, s.i, p.look, STORY_ART[s.id + '_' + (s.i + 1)]);
   const fade = Math.min(1, s.t / 25);
   c.fillStyle = `rgba(0,0,0,${1 - fade})`; c.fillRect(0, 0, W, H);
@@ -311,7 +312,7 @@ function updBrief() {
 }
 function drawBrief(c) {
   const i = G.briefIdx, st = STAGES[i], k = Math.min(1, G.sceneT / 30);
-  drawKenBurns(c, st.theme, (G.sceneT % 1200) / 1200, i, st.look);
+  drawKenBurns(c, st.theme, Math.min(1, G.sceneT / 1200), i, st.look);
   c.fillStyle = 'rgba(6,4,3,0.62)'; c.fillRect(0, 0, W, H);
   const g = c.createLinearGradient(0, 0, W * 0.7, 0); g.addColorStop(0, 'rgba(0,0,0,0.85)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   c.fillStyle = g; c.fillRect(0, 0, W, H);

@@ -299,6 +299,22 @@ const Music = {
     const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 1.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
     s.connect(hp); hp.connect(g); s.start(t); s.stop(t + 1.7); this.out(g, 0.6, 0.8);
   },
+  bell(f, t, vol, st) {   // glockenspiel: bright partials that ring and fade
+    const ac = Sound.ac, g = ac.createGain();
+    for (const [mul, v] of [[1, 1], [2.76, 0.4], [5.4, 0.18]]) { const o = ac.createOscillator(), og = ac.createGain(); o.type = 'sine'; o.frequency.value = f * mul; og.gain.value = v; o.connect(og); og.connect(g); o.start(t); o.stop(t + 1.6); }
+    this.env(g, t, 0.003, vol, 0.02, 1.4); this.out(g, 0.6, 0.7, st);
+  },
+  cheer(t, dur, vol, st) {   // a crowd roaring: band-passed noise in three registers, each wobbling like many voices
+    const ac = Sound.ac;
+    for (const [fq, q, v] of [[650, 1.2, 1], [1400, 1.5, 0.7], [2700, 2, 0.35]]) {
+      const s = ac.createBufferSource(); s.buffer = Sound.noiseBuf; s.loop = true;
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = fq; bp.Q.value = q;
+      const g = ac.createGain(), trem = ac.createOscillator(), tg = ac.createGain();
+      trem.frequency.value = 6 + Math.random() * 5; tg.gain.value = vol * v * 0.35; trem.connect(tg); tg.connect(g.gain);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * v, t + 0.35); g.gain.setValueAtTime(vol * v, t + dur * 0.55); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(bp); bp.connect(g); s.start(t); s.stop(t + dur + 0.1); trem.start(t); trem.stop(t + dur + 0.1); this.out(g, 0.5, 0.9, st);
+    }
+  },
   crash(t, vol, st) {
     const ac = Sound.ac, s = ac.createBufferSource(); s.buffer = Sound.noiseBuf; s.loop = true;
     const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3500;
@@ -321,22 +337,28 @@ const Music = {
     const t = ac.currentTime + 0.02, F = s => 440 * Math.pow(2, (s + N('D')) / 12);
     const duck = (len) => { this.duck.gain.cancelScheduledValues(t); this.duck.gain.setTargetAtTime(0.15, t, 0.03); this.duck.gain.setTargetAtTime(1, t + len, 0.4); };
     switch (name) {
-      case 'ko': {   // victory fanfare: "ta-ta-ta TAAA — ta-da-da DAAA!" in a bright major key
-        duck(3.4);
-        const s = 0.12, M = (n, tt, d, v = 0.075) => { for (const iv of [0, 12]) this.brass(F(n + iv), tt, d, v, true); this.brass(F(n - 5), tt, d, v * 0.6, true); };
-        // pickup triplet on the fifth, then the tonic held
-        [0, 1, 2].forEach(i => { M(7, t + i * s, s * 0.75); this.taiko(t + i * s, 0.45, 1.4, true); });
-        M(12, t + 3 * s, s * 2.6); this.taiko(t + 3 * s, 0.8, 1.1, true);
-        // climbing answer: third, fifth... onto the high tonic
-        const b = t + 3 * s + s * 3;
-        M(16, b, s * 0.8); M(19, b + s, s * 0.8);
-        const top = b + 2 * s;
-        // the big major chord with cymbals, choir and a rising timpani roll
-        for (const iv of [0, 4, 7, 12, 16, 19, 24]) this.brass(F(iv), top, 1.6, 0.05, true);
-        for (const iv of [12, 16, 19]) this.choir(F(iv), top, 1.8, 0.06, true);
-        this.crash(top, 0.6, true); this.crash(top + 0.9, 0.25, true);
-        for (let i = 0; i < 8; i++) this.taiko(top - 0.32 + i * 0.04, 0.35 + i * 0.07, 1.2, true);
-        this.taiko(top, 1, 0.9, true);
+      case 'ko': {   // VICTORY: impact, trumpet pickup "ta-ta-ta TAAA", then the IV–V–I cadence into a
+                     // big D-major chord with a rising trumpet flourish, bells, choir, timpani roll, cymbals and a cheering crowd
+        duck(3.8);
+        const chord = (ivs, tt, d, v) => { for (const iv of ivs) this.brass(F(iv), tt, d, v, true); };
+        this.taiko(t, 1, 0.75, true); this.crash(t, 0.35, true);
+        // pickup: three quick stabs on the fifth, then the tonic held high over the full chord
+        for (let i = 0; i < 3; i++) { const tt = t + 0.06 + i * 0.105; chord([7, 19], tt, 0.07, 0.08); this.taiko(tt, 0.4, 1.5, true); }
+        const t1 = t + 0.4;
+        chord([0, 4, 7, 12, 24], t1, 0.42, 0.065); this.taiko(t1, 0.9, 1, true); this.crash(t1, 0.4, true);
+        // cadence: IV (G) – V (A) – I (D)
+        const t2 = t1 + 0.5, t3 = t2 + 0.2, t4 = t3 + 0.22;
+        chord([5, 9, 12, 17], t2, 0.16, 0.065); this.taiko(t2, 0.6, 1.2, true);
+        chord([7, 11, 14, 19], t3, 0.18, 0.07); this.taiko(t3, 0.7, 1.1, true);
+        for (let i = 0; i < 6; i++) this.taiko(t3 + i * 0.035, 0.3 + i * 0.1, 1.3, true);   // timpani roll into the final chord
+        // the final chord: brass, strings and choir, trumpet flourish on top
+        chord([-12, 0, 4, 7, 12, 16], t4, 1.7, 0.055);
+        for (const iv of [0, 7, 12, 16]) this.strings(F(iv), t4, 1.9, 0.04, 2600, true);
+        for (const iv of [12, 16, 19]) this.choir(F(iv), t4, 1.9, 0.055, true);
+        [[16, 0], [19, 0.09], [24, 0.18]].forEach(([n, dt]) => this.brass(F(n), t4 + dt, n === 24 ? 1.3 : 0.08, 0.07, true));
+        [24, 28, 31, 36, 31, 36].forEach((n, i) => this.bell(F(n), t4 + 0.05 + i * 0.075, 0.07, true));
+        this.taiko(t4, 1, 0.9, true); this.crash(t4, 0.65, true); this.crash(t4 + 1.1, 0.25, true);
+        this.cheer(t4 - 0.1, 2.6, 0.11, true);
         break;
       }
       case 'boss': {   // the horn: a huge low brass blast as a boss walks in

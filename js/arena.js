@@ -76,7 +76,7 @@ function leaveArena() {
 
 /* ---------- PvP rules used by the combat code ---------- */
 function arenaFoes(f) { return G.players.filter(o => o !== f && o.side !== f.side && o.state !== 'out'); }
-function arenaBound(p) { p.x = clamp(p.x, 40, ARENA_W - 40); p.y = clamp(p.y, BELT_TOP, BELT_BOT); }
+function arenaBound(p) { const m = Math.max(40, bodyHalf(p) * 1.1 + 10); p.x = clamp(p.x, m, ARENA_W - m); p.y = clamp(p.y, BELT_TOP, BELT_BOT); }   // whole body stays inside the arena walls
 // My attack connected with someone else's fighter: show it now, let their game apply it
 function arenaHitRemote(t, a, dmg, m) {
   if (!t.canBeHit || (t.hitLockUntil || 0) > G.t) return false;
