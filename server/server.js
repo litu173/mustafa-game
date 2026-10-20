@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* =========================================================
-   MUSTAFA online server.
+   Mustafa Reborn online server.
    - Serves the game's static files (so one deploy hosts everything).
    - WebSocket at /ws: channels (lobbies), presence, chat, friends,
      teams, match rooms (duel / free-for-all / team vs team) and
@@ -360,4 +360,4 @@ setInterval(() => {
 }, 30000);
 wss.on('connection', ws => ws.on('pong', () => { ws._dead = false; }));
 
-server.listen(PORT, () => console.log(`MUSTAFA server on http://localhost:${PORT}  (WebSocket /ws)`));
+server.listen(PORT, () => console.log(`Mustafa Reborn server on http://localhost:${PORT}  (WebSocket /ws)`));

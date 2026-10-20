@@ -1,4 +1,4 @@
-# One-click deploy of the MUSTAFA game + online server on Render (https://render.com)
+# One-click deploy of the Mustafa Reborn game + online server on Render (https://render.com)
 services:
   - type: web
     name: mustafa-reborn
