@@ -954,6 +954,14 @@ function drawProjectile(c, b, x, y) {
       c.restore();
       break;
     }
+    case 'laser': {
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const g = c.createLinearGradient(x - d * 90, y, x, y); g.addColorStop(0, 'rgba(40,220,255,0)'); g.addColorStop(1, 'rgba(200,250,255,1)');
+      c.strokeStyle = g; c.lineWidth = 7; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - d * 90, y); c.lineTo(x, y); c.stroke();
+      glow(c, x, y, 26, 'rgba(60,220,255,0.7)');
+      c.restore();
+      break;
+    }
     case 'orb': {
       c.save(); c.globalCompositeOperation = 'lighter';
       const r = 30 + Math.sin(G.t * 0.4) * 4;

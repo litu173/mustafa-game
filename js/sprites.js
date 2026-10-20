@@ -33,6 +33,7 @@ const SPRITE_DEFS = {
 const ITEM_IDX = { pizza: 0, hotdog: 1, meat: 2, apple: 3, gem: 4, gold: 5, pistol: 6, rifle: 7, uzi: 8, shotgun: 9, bazooka: 10, grenade: 11, knife: 12, machete: 13, pipe: 14, rock: 15, crate: 16, barrel: 17 };
 
 function loadSprites() {
+  { const im = new Image(); SPR.total++; im.onload = () => { SPR.port = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/portraits.jpg?v=1'; }
   { const im = new Image(); SPR.total++; im.onload = () => { SPR.logo = im; SPR.loaded++; }; im.onerror = () => { SPR.total--; }; im.src = 'assets/logo.png?v=1'; }
   const atlas = window.ATLAS || {};
   for (const name of Object.keys(atlas)) {
@@ -294,7 +295,10 @@ function drawCarSpr(c, x, y, damaged, flash) {
   const fr = window.ATLAS.car[0];
   return drawSprite(c, 'car', damaged ? 1 : 0, x, y, 1, 760 / fr.w, { flash });
 }
+// painted HD portraits (assets/portraits.jpg, 320px cells), used everywhere a face is shown
+const PORT_IDX = { mustafa: 0, rakib: 1, nadia: 2, bablu: 3, kaiser: 4, mutant: 4, butcher: 5, saju: 6, morgol: 7, captain: 8, razor: 8, hakim: 9 };
 function drawPortraitSpr(c, key, x, y, r) {
+  if (SPR.port && PORT_IDX[key] !== undefined) { c.drawImage(SPR.port, PORT_IDX[key] * 320, 0, 320, 320, x - r, y - r, r * 2, r * 2); return true; }
   const d = SPRITE_DEFS[key]; if (!d) return false;
   const hd = SPR.head[d.a], im = SPR.img[d.a]; if (!hd || !im) return false;
   const fr = window.ATLAS[d.a][0], s = hd.size;

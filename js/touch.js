@@ -121,7 +121,6 @@ const Touch = (() => {
     let mode = 'off';
     if (g && !modal) {
       if (g.scene === 'play' && !g.paused) mode = 'play';
-      else if (g.scene === 'select' || (g.scene === 'title' && g.overlay === 'stages')) mode = 'select';
     }
     const portrait = innerHeight > innerWidth;
     const cls = mode + (Save.d.lefty ? ' lefty' : '') + (portrait ? ' portrait' : '') + (g && g.scene === 'select' ? ' sel' : '') + (g && g.arena ? ' arena' : '');

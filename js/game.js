@@ -112,8 +112,7 @@ function explode(x, y, z, owner, dmg, radius) {
 /* ---------- combat ---------- */
 function targetsOf(f) {
   if (f.team === 'hero') return G.arena ? arenaFoes(f) : G.enemies;
-  if (f.def.dino) return G.players.concat(G.enemies.filter(e => isHuman(e)));
-  return G.players;
+  return G.players;   // the gang's beasts and men fight on the same side
 }
 function hitBox(f, range, depth, dmg, m) {
   let hit = false;
@@ -148,6 +147,7 @@ function hitArea(f, radius, depth, dmg, m) {
 
 function damage(t, a, dmg, m = {}) {
   if (G.arena && t.remote) return arenaHitRemote(t, a, dmg, m);   // online: the victim's own game applies it
+  if (G.arena && a && a.netId) t.lastHitBy = a.netId;              // bot matches: hits land locally
   if (!t.canBeHit) return false;
   dmg = Math.max(1, Math.round(dmg));
   const dir = m.dir || Math.sign(t.x - a.x) || a.facing || 1;
@@ -305,6 +305,7 @@ function fire(f, kind) {
     case 'ebullet': P({ kind: 'bullet', vx: dir * 12, dmg: 8, life: 140 }); muzzle(); Sound.play('egun'); break;
     case 'epellets': for (const oy of [-24, 0, 24]) P({ kind: 'pellet', y: f.y + oy, vx: dir * 15, dmg: 9, life: 40, down: true }); muzzle(60); Sound.play('shotgun'); break;
     case 'erock': P({ kind: 'rock', vx: dir * 10 - (G.drive ? 0 : 0), dmg: 9, life: 120 }); Sound.play('whoosh'); break;
+    case 'elaser': P({ kind: 'laser', vx: dir * 22, dmg: 11, life: 90 }); Sound.play('laser'); break;
     case 'orb': {
       const ys = f.enraged ? [-50, 0, 50] : [0];
       for (const oy of ys) P({ kind: 'orb', y: f.y + oy, vx: dir * 7, dmg: 12, life: 200, homing: true, down: true });
@@ -513,7 +514,7 @@ function nearWeapon(p) {
   return null;
 }
 function pickWeapon(p, it) {
-  if (G.arena && !it.granted) { arenaTake(it); return; }   // online: the host confirms who got it
+  if (G.arena && !it.granted) { arenaTake(it, p); return; }   // online: the host confirms who got it
   it.remove = true; p.weapon = it.kind;
   p.ammo = it.ammo || weaponAmmo(it.kind);
   if (MELEE_W[it.kind]) p.wdur = it.wdur || MELEE_W[it.kind].dur;
@@ -536,15 +537,7 @@ function playerLost(p) {
 function targetFor(e) {
   const p = G.players[0];
   const okP = p && p.state !== 'dead' && p.state !== 'drop' ? p : null;
-  if (!e.def.dino || e.def.flyer) return okP;
-  // wild dinosaurs go for whoever is closest — gang members included
-  let best = okP, bd = okP ? Math.abs(okP.x - e.x) * 0.7 + Math.abs(okP.y - e.y) : 1e9;
-  for (const o of G.enemies) {
-    if (o === e || o.def.dino || o.hp <= 0 || !o.canBeHit) continue;
-    const d = Math.abs(o.x - e.x) + Math.abs(o.y - e.y);
-    if (d < bd) { bd = d; best = o; }
-  }
-  return best;
+  return okP;
 }
 function onScreen(e) { return e.x > G.camX + 40 && e.x < G.camX + W - 40; }
 function updateEnemy(e) {
@@ -903,7 +896,7 @@ function updateWaves() {
   // calm dinosaurs wander off once the fight is over
   if (!G.queue.length && active.length === 0) for (const e of G.enemies) if (e.docile) e.leaving = true;
   if (!G.queue.length && G.enemies.length === 0 && !feeding) {
-    if (Mission.targetsLeftIn(G.camLock)) { if (G.t % 240 === 0) popText(G.camX + W / 2, 600, 300, OBJ_PROPS[G.props.find(p => p.obj && !p.remove).kind].label + ' LEFT!', '#7dff9a', 30); return; }
+    if (Mission.targetsLeftIn(G.camLock)) { if (G.t % 240 === 0) popText(G.camX + W / 2, 600, 300, fmt(OBJ_PROPS[G.props.find(p => p.obj && !p.remove).kind].label) + ' LEFT!', '#7dff9a', 30); return; }
     if (G.mission) { G.mission.surv = null; if (G.mission.car) G.mission.car.safe = true; }
     G.camLock = null; G.waveIdx++;
     if (G.waveIdx >= st.waves.length) stageClear();
@@ -982,6 +975,7 @@ function menuInput(n, key, horizontal) {
   if (Input.hit(next)) { G[key] = (G[key] + 1) % n; Sound.play('select'); }
   if (G.rects) for (const R of G.rects) {
     const m = Input.mouse;
+    if (typeof R.i !== 'number') continue;   // close / back buttons are handled by their screens
     if (m.x >= R.x && m.x <= R.x + R.w && m.y >= R.y && m.y <= R.y + R.h) {
       if (m.moved && G[key] !== R.i) { G[key] = R.i; Sound.play('select'); }
       if (m.click) { G[key] = R.i; chosen = R.i; }
@@ -1007,6 +1001,7 @@ function titleItems() {
 function updTitle() {
   updateTitleFx();
   if (G.overlay === 'help') {
+    if (tapped('close')) { G.overlay = null; Sound.play('select'); return; }
     if (Input.confirm() || Input.hit('back') || Input.mouse.click) { G.overlay = null; Sound.play('select'); }
     return;
   }
@@ -1014,7 +1009,7 @@ function updTitle() {
     const ch = menuInput(STAGES.length, 'stageSel', true);
     if (Input.hit('up')) G.stageSel = (G.stageSel + STAGES.length - 4) % STAGES.length;
     if (Input.hit('down')) G.stageSel = (G.stageSel + 4) % STAGES.length;
-    if (Input.hit('back')) { G.overlay = null; return; }
+    if (Input.hit('back') || tapped('close')) { G.overlay = null; Sound.play('select'); return; }
     if (ch >= 0) {
       if (ch > (Save.d.premium ? 99 : Save.d.mission || 0)) { Sound.play('denied'); openRoyal(); return; }
       G.startStage = ch; G.overlay = null; G.campaign = true; goSelect();
@@ -1022,7 +1017,7 @@ function updTitle() {
     return;
   }
   if (!G.titleReady) {
-    if (G.loadT === undefined || G.t - G.loadT < 18) return;   // still loading
+    if (G.loadT === undefined || G.t - G.loadT < 18) return;   // still on the loading screen
     if (Input.anyKey() || Input.mouse.click) { G.titleReady = true; Music.play('title'); Sound.play('confirm'); }
     return;
   }
@@ -1048,7 +1043,8 @@ function updSelect() {
     else openRoyal();
     return;
   }
-  if (Input.hit('back')) { G.scene = 'title'; G.sceneT = 0; return; }
+  if (Input.hit('back') || tapped('back')) { G.scene = 'title'; G.sceneT = 0; Sound.play('select'); return; }
+  if (tapped('royalBtn')) Input.pressed.KeyR = true;
   if (ch >= 0) { G.freshRun = true; openBrief(G.startStage); }
 }
 function updIntro() {

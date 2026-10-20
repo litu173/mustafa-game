@@ -24,7 +24,9 @@ six bosses, and **online duels, free-for-alls and team-vs-team battles**.
 
 **Difficulty:** title menu → LEVEL cycles NORMAL / HARD (default) / LEGEND. Villains surround you, sidestep punches, punish whiffed combos and break out of long combos with a COUNTER.
 
-**Campaign — Operation Green Valley:** a cinematic prologue, then 12 missions in 4 chapters (The Drowned City, Green Valley, Home Under Siege, The Fang Serum) with briefings, radio chatter and different objectives: clear the area, destroy jammers / serum tanks, free caged dinosaurs, rescue villagers, survive an ambush, defend the Cadillac, beat the clock, the Hell Road car chase and boss hunts. Elite villains (Fang Elite, Iron Motka, Fang Sniper, Alpha Raptor, Fang Captain) and 6 bosses. Progress is saved; MISSIONS replays any unlocked mission.
+**Campaign — Operation Reborn:** a sci-fi adventure in 5 chapters and 14 missions. Mustafa and Team Reborn (BOLT the mechanic, NOVA the storm, TITAN the bulldozer) chase Dr. Kaiser, who wants the Chrono-Fang time crystal, cyber-dinosaurs and an army from 65 million years ago. Missions: clear the area, smash jammers / serum tanks / power cores / rift pylons, free caged dinosaurs, rescue villagers, survive ambushes, defend the Cadillac, beat the clock, the Hell Road chase, a rescue mission for a kidnapped teammate, and boss hunts. Elite and cyber enemies (Cyber Raptor, Fang Trooper with lasers). Progress is saved; MISSIONS replays any unlocked mission.
+
+**ROBOPLAY:** robot players for online battles. Press PLAY VS ROBOPLAY (duel, free-for-all or team) any time, even offline; if nobody joins a quick match within 12 seconds, ROBOPLAY joins automatically.
 
 **Live worlds and music:** parallax backgrounds with moving clouds, water, waterfalls, searchlights and smoke; rain, storms with lightning, fog, embers and fireflies; night / dusk / alarm lighting. Each mission has its own adaptive score that builds up as the fight gets intense, muffles with a heartbeat at low health, and hits big stingers for bosses, objectives and the K.O.
 

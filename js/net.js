@@ -3,8 +3,8 @@
    MUSTAFA — online client: connection + the Online Hub
    (quick play, live fight cards, VS room, friends, teams, chat).
    ========================================================= */
-const HERO_NAMES = { mustafa: 'Mustafa', rakib: 'Rakib', nadia: 'Nadia', bablu: 'Bablu' };
-const HERO_ROLE = { mustafa: 'The Hunter', rakib: 'The Mechanic', nadia: 'The Diplomat', bablu: 'The Bulldozer' };
+const HERO_NAMES = { mustafa: 'Mustafa', rakib: 'Bolt', nadia: 'Nova', bablu: 'Titan' };
+const HERO_ROLE = { mustafa: 'The Hunter', rakib: 'The Mechanic', nadia: 'The Storm', bablu: 'The Bulldozer' };
 const MODE_INFO = {
   duel: { title: 'Quick Duel', short: 'DUEL', sub: '1 vs 1 · starts as soon as an opponent joins', icon: '⚔' },
   ffa: { title: 'Free-for-all', short: 'FREE-FOR-ALL', sub: 'Up to 4 fighters · last one standing', icon: '☠' },
@@ -120,7 +120,13 @@ const Net = {
       if (id === 'teamName') { e.preventDefault(); this.act('teamCreate'); }
       if (id === 'chanInput') { e.preventDefault(); this.act('joinCustom'); }
     });
-    setInterval(() => { if (this.open && this.room && this.room.countdown) this.render(); }, 500);
+    setInterval(() => {
+      const r = this.room, alone = this.open && r && r.quick && r.status !== 'playing' && r.players.length <= 1;
+      if (!alone) this.waitSince = 0;
+      else if (!this.waitSince) this.waitSince = Date.now();
+      else if (Date.now() - this.waitSince > 12000) { this.toast('Nobody online right now — ROBOPLAY joins the fight!'); this.act('robo', { mode: r.mode }); return; }
+      if (this.open && r && (r.countdown || alone)) this.render();
+    }, 500);
     this.render();
   },
 
@@ -152,12 +158,12 @@ const Net = {
     const statusTxt = { online: 'ONLINE', connecting: 'CONNECTING…', offline: 'OFFLINE' }[this.status];
     const s = this.social, reqCount = s.requests.length + s.teamInvites.length;
     const head = `<header>
+        <button class="back" data-act="back" aria-label="Back">◀</button>
         <div class="brand"><img src="assets/logo.png?v=1" alt="Mustafa Reborn"><span class="sub">ONLINE ARENA</span></div>
         <span class="status ${this.status}"><i></i>${statusTxt}</span>
         ${this.status === 'offline' ? '<button class="btn sm" data-act="reconnect">Retry</button>' : ''}
         <label class="chan"># <select id="chanSelect">${(this.channels.length ? this.channels : [{ name: this.channel || 'Global', count: 0 }]).map(c => `<option value="${esc(c.name)}" ${c.name === this.channel ? 'selected' : ''}>${esc(c.name)} (${c.count})</option>`).join('')}${this.channel && !this.channels.some(c => c.name === this.channel) ? `<option selected>${esc(this.channel)}</option>` : ''}</select></label>
         <div class="mechip">${this.avatar(this.me.hero, 34)}<input id="nameInput" maxlength="20" value="${esc(this.me.name)}" placeholder="Your name" title="Click to rename"></div>
-        <button class="x" data-act="close" aria-label="Close">&times;</button>
       </header>
       <nav class="tabs">
         ${[['play', this.room ? '⚔ YOUR MATCH' : '⚔ PLAY'], ['friends', '♥ FRIENDS'], ['team', '⚑ TEAM']].map(([k, l]) => `<button class="tab ${this.tab === k ? 'sel' : ''}" data-act="tab" data-tab="${k}">${l}${k === 'friends' && reqCount ? `<b class="badge">${reqCount}</b>` : ''}</button>`).join('')}
@@ -168,10 +174,10 @@ const Net = {
     if (this.tab === 'play') main = this.room ? this.roomView() : this.lobbyView();
     else if (this.tab === 'friends') main = this.friendsView();
     else main = this.teamView();
-    if (this.chatOpen === undefined) this.chatOpen = innerWidth > 980;
+    if (this.chatOpen === undefined) this.chatOpen = false;
     this.el.querySelector('.hub').innerHTML = `${head}${invites ? `<div class="invites">${invites}</div>` : ''}
-      <div class="body ${this.chatOpen ? '' : 'nochat'}"><div class="main">${main}</div>${this.chatOpen ? this.chatView() : ''}</div>
-      <button class="chatfab" data-act="chatToggle">${this.chatOpen ? '✕' : '💬'}${!this.chatOpen && this.unread ? `<b>${this.unread}</b>` : ''}</button>`;
+      <div class="body nochat"><div class="main">${main}</div></div>
+      ${this.chatOpen ? this.chatView() : `<button class="chatfab" data-act="chatToggle"><span>💬</span> CHAT${this.unread ? `<b>${this.unread}</b>` : ''}</button>`}`;
     if (this.chatOpen) this.unread = 0;
     for (const [id, v] of Object.entries(keep)) { const inp = document.getElementById(id); if (inp && id !== 'nameInput') inp.value = v; }
     if (focused) { const f = document.getElementById(focused); if (f) f.focus(); }
@@ -219,6 +225,7 @@ const Net = {
         ${this.heroCarousel(this.me.hero)}
         <div class="playcol"><div class="modes">${modes}</div>
           <button class="findbtn" data-act="quick" data-mode="${qm}">⚔ FIND MATCH<small>${MODE_INFO[qm].title} · starts automatically</small></button>
+          <button class="robobtn" data-act="robo" data-mode="${qm}">⚙ PLAY VS ROBOPLAY<small>robot players · works offline</small></button>
           <button class="linkbtn" data-act="toggleCreate">${this.creating ? 'Close' : 'Play with friends: create a private match'}</button></div>
       </div>
       ${create}
@@ -243,7 +250,8 @@ const Net = {
       arena = slots.map((p, i) => card(p, i % 2 === 1)).join('<div class="bigvs">VS</div>');
     }
     const cd = r.countdown ? Math.ceil(r.countdown / 1000) : 0;
-    const status = cd ? `<div class="countdown">FIGHT STARTS IN <b>${cd}</b></div>` : r.quick ? `<div class="countdown wait">Looking for opponents… the fight starts automatically</div>` : '';
+    const roboIn = this.waitSince ? Math.max(0, Math.ceil((12000 - (Date.now() - this.waitSince)) / 1000)) : 12;
+    const status = cd ? `<div class="countdown">FIGHT STARTS IN <b>${cd}</b></div>` : r.quick ? `<div class="countdown wait">Looking for opponents… ${r.players.length <= 1 ? `ROBOPLAY joins in <b>${roboIn}</b>s` : 'the fight starts automatically'}</div>` : '';
     return `<div class="banner" style="background-image:linear-gradient(90deg,rgba(8,4,4,.92),rgba(8,4,4,.35)),url(${stageImg(r.stage)})">
         <span class="mode m-${r.mode}">${MODE_INFO[r.mode].short}</span><h2>${esc(r.name)}</h2><p>${esc((ARENAS[r.stage] || {}).name || '')} · ${r.players.length}/${r.max} fighters</p>${status}</div>
       <div class="vsarea ${r.mode === 'team' ? 'team' : ''}">${arena}</div>
@@ -251,6 +259,7 @@ const Net = {
       ${isHost && !r.quick ? `<section><h3>STAGE</h3><div class="stages">${ARENAS.map((st, i) => `<button class="stage ${r.stage === i ? 'sel' : ''}" data-act="roomStage" data-i="${i}" style="background-image:url(${stageImg(i)})"><span>${esc(st.name)}</span></button>`).join('')}</div></section>` : ''}
       <div class="actions">
         ${r.quick ? '' : isHost ? `<button class="btn gold big" data-act="start">⚔ START FIGHT</button>` : `<button class="btn ${mine.ready ? '' : 'gold'} big" data-act="ready">${mine.ready ? 'Cancel ready' : '✓ I\'M READY'}</button>`}
+        ${r.quick && r.players.length <= 1 ? `<button class="btn gold big" data-act="robo" data-mode="${r.mode}">⚙ Fight ROBOPLAY now</button>` : ''}
         <button class="btn big" data-act="leaveRoom">Leave</button></div>`;
   },
   friendsView() {
@@ -287,7 +296,7 @@ const Net = {
     if (!scopes.includes(this.chatScope)) this.chatScope = 'channel';
     const msgs = this.chat.filter(c => c.scope === this.chatScope).slice(-60)
       .map(c => `<div class="msg"><b class="${c.from === this.me.id ? 'me' : ''}">${esc(c.name)}</b> ${esc(c.text)}</div>`).join('') || '<div class="empty">Say hello to everyone!</div>';
-    return `<aside class="chat"><div class="ctabs">${scopes.map(sc => `<button class="ctab ${sc === this.chatScope ? 'sel' : ''}" data-act="scope" data-scope="${sc}">${sc === 'channel' ? '#' + esc(this.channel || 'chat') : sc === 'room' ? 'Match' : 'Team'}</button>`).join('')}</div>
+    return `<aside class="chat"><div class="chathead"><b>💬 CHAT</b><button class="cclose" data-act="chatToggle" aria-label="Close chat">✕</button></div><div class="ctabs">${scopes.map(sc => `<button class="ctab ${sc === this.chatScope ? 'sel' : ''}" data-act="scope" data-scope="${sc}">${sc === 'channel' ? '#' + esc(this.channel || 'chat') : sc === 'room' ? 'Match' : 'Team'}</button>`).join('')}</div>
       <div class="msgs" id="msgs">${msgs}</div><div class="row"><input id="chatInput" maxlength="200" placeholder="Type a message…"><button class="btn sm gold" data-act="chat">Send</button></div></aside>`;
   },
   sendChat() {
@@ -308,12 +317,16 @@ const Net = {
     Sound.play('select');
     switch (a) {
       case 'close': this.closeHub(); break;
+      case 'back': if (this.chatOpen) { this.chatOpen = false; this.render(); } else if (this.tab !== 'play') { this.tab = 'play'; this.render(); } else if (this.room) this.send({ t: 'roomLeave' }); else this.closeHub(); break;
       case 'reconnect': this.retry = 0; this.connect(); break;
       case 'tab': this.tab = d.tab; this.render(); break;
       case 'hero': this.me.hero = d.hero; this.saveIdent({ hero: d.hero }); G.selIdx = Math.max(0, HEROES.findIndex(h => h.id === d.hero));
         this.send({ t: 'profile', hero: d.hero }); if (this.room) this.send({ t: 'roomUpdate', hero: d.hero }); this.render(); break;
       case 'joinCustom': { const ch = (val('chanInput') || '').trim(); if (ch) this.send({ t: 'join', channel: ch }); break; }
-      case 'quick': this.send({ t: 'quick', mode: d.mode }); Sound.play('confirm'); break;
+      case 'quick':
+        if (this.status !== 'online') { this.toast('Server unreachable — ROBOPLAY will fight you instead!'); this.act('robo', d); return; }
+        this.send({ t: 'quick', mode: d.mode }); Sound.play('confirm'); break;
+      case 'robo': { const mode = d.mode || (this.room && this.room.mode) || this.qmode || 'duel'; if (this.room) { this.send({ t: 'roomLeave' }); this.room = null; } this.waitSince = 0; this.hideHub(); startBotMatch(mode); break; }
       case 'qmode': this.qmode = d.mode; this.render(); break;
       case 'chatToggle': this.chatOpen = !this.chatOpen; this.render(); break;
       case 'heroStep': { const keys = Object.keys(HERO_NAMES), cur = (this.room && (this.room.players.find(p => p.id === this.me.id) || {}).hero) || this.me.hero; const nx = keys[(keys.indexOf(cur) + (+d.d) + keys.length) % keys.length]; this.act('hero', { hero: nx }); return; }

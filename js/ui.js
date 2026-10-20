@@ -46,13 +46,13 @@ const LOAD_TIPS = ['Push the stick all the way to run', 'Villains break long com
   'Calm dinosaurs only fight back if you hit them', 'Low health? Smash barrels for pizza, hot dogs and meat', 'Royal Pass members keep fighting with unlimited continues'];
 function assetsReady() { return !!SPR.cover && !!SPR.logo && SPR.loaded >= SPR.total; }
 function drawTitle(c) {
-  if (assetsReady() && G.loadT === undefined) G.loadT = G.t;          // remember when loading finished
+  if (assetsReady() && G.loadT === undefined && G.t > 210) G.loadT = G.t;   // a short show even on fast connections          // remember when loading finished
   if (G.loadT !== undefined && G.t - G.loadT > 18) return drawTitleCover(c);
   drawLoader(c, G.loadT !== undefined ? 1 - (G.t - G.loadT) / 18 : 1);
 }
 function drawLoader(c, alpha) {
   const t = G.t, k = SPR.total ? SPR.loaded / SPR.total : 0;
-  G.loadShown = Math.min(k, (G.loadShown || 0) + 0.02);               // smooth bar
+  G.loadShown = Math.min(k, G.t / 200, (G.loadShown || 0) + 0.02);               // smooth bar
   c.save(); c.globalAlpha = Math.max(0, alpha);
   const g = c.createRadialGradient(W / 2, H * 0.42, 40, W / 2, H / 2, W * 0.7);
   g.addColorStop(0, '#3a120a'); g.addColorStop(0.55, '#140706'); g.addColorStop(1, '#050304');
@@ -116,6 +116,7 @@ function drawHelp(c) {
   });
   txt(c, 'Free players get 3 lives  ·  Royal Pass: 5 lives + unlimited continues', W / 2, 632, { font: '600 15px Cinzel, serif', align: 'center', fill: '#bfae86' });
   W = W0; c.restore();
+  G.rects = [{ x: W - 96 - SAFE.r, y: 18, w: 70, h: 70, i: 'close' }]; closeX(c, W - 61 - SAFE.r, 53);
 }
 function drawStageSelect(c) {
   c.fillStyle = 'rgba(5,3,6,0.82)'; c.fillRect(0, 0, W, H);
@@ -189,7 +190,15 @@ function drawSelect(c) {
   txt(c, h.desc, W / 2, 624, { font: '600 20px Cinzel, serif', align: 'center', fill: '#efe3c8' });
   const royalHint = Save.d.premium ? (G.royal ? 'R  Royal costume: ON' : 'R  Royal costume: OFF') : 'R  Royal costume ♛';
   txt(c, TOUCH ? 'Tap a hero to fight  ·  ♛ ROYAL for the royal costume' : '← → choose   ·   ENTER / J  fight   ·   ' + royalHint + '   ·   ESC back', W / 2, 668, { font: '600 15px Cinzel, serif', align: 'center', fill: '#bfae86' });
-  if (G.startStage > 0) txt(c, 'Starting at stage ' + (G.startStage + 1), W / 2, 698, { font: '600 14px Cinzel, serif', align: 'center', fill: '#f3cf6a' });
+  if (G.startStage > 0) txt(c, 'Mission ' + (G.startStage + 1) + ': ' + STAGES[G.startStage].name, W / 2, 698, { font: '600 14px Cinzel, serif', align: 'center', fill: '#f3cf6a' });
+  // on-screen back and royal-costume buttons (touch and mouse)
+  pillButton(c, 24 + SAFE.l, 22, 150, 46, '\u25c0  BACK', 'back');
+  pillButton(c, W - 194 - SAFE.r, 22, 170, 46, '\u265b  ROYAL', 'royalBtn');
+}
+function pillButton(c, x, y, w, h, label, id) {
+  G.rects.push({ x, y, w, h, i: id });
+  panel(c, x, y, w, h, { r: h / 2, noInner: true, top: 'rgba(20,12,6,0.85)', bot: 'rgba(10,6,4,0.85)', border: 'rgba(212,175,55,0.7)' });
+  txt(c, label, x + w / 2, y + h / 2 + 6, { font: '700 17px Cinzel, serif', align: 'center', fill: '#f3dc9a' });
 }
 
 /* ---------- HUD ---------- */
@@ -310,7 +319,7 @@ function drawIntro(c) {
   const slide = Math.max(0, 1 - (k - 10) / 25) * 200;
   txt(c, 'MISSION ' + (G.stageIdx + 1) + '  ·  ' + CHAPTERS[st.chapter || 0], W / 2 - slide, H / 2 - 40, { font: '700 22px Cinzel, serif', align: 'center', fill: '#bfae86' });
   txt(c, st.name, W / 2 + slide, H / 2 + 18, { font: '900 58px Cinzel, serif', align: 'center', fill: goldGrad(c, H / 2 - 30, H / 2 + 20), stroke: '#120800', sw: 7 });
-  txt(c, st.sub, W / 2, H / 2 + 58, { font: '600 18px Cinzel, serif', align: 'center', fill: '#efe3c8' });
+  txt(c, fmt(st.sub), W / 2, H / 2 + 58, { font: '600 18px Cinzel, serif', align: 'center', fill: '#efe3c8' });
 }
 function drawClear(c) {
   const b = G.bonus, k = G.sceneT;
@@ -409,14 +418,30 @@ function drawEnding(c) {
 }
 
 /* ---------- Cover title (painted poster) ---------- */
-function coverImage(c, t, lower = 0) {   // lower: push the heroes down to leave sky for the logo
-  const im = SPR.cover, z = (1.04 + lower / 380 + Math.sin(t * 0.004) * 0.02) * Math.max(W / im.width, H / im.height);
-  const w = im.width * z, h = im.height * z;
-  c.drawImage(im, (W - w) / 2, Math.min(0, (H - h) / 2 - 6 + lower), w, h);
+let COVER_BG = null;
+function coverImage(c, t) {
+  const im = SPR.cover;
+  if (!COVER_BG || COVER_BG.width !== W) {   // blurred backdrop for the spare space around the painting
+    COVER_BG = document.createElement('canvas'); COVER_BG.width = W; COVER_BG.height = H;
+    const b = COVER_BG.getContext('2d'), z = Math.max(W / im.width, H / im.height) * 1.1;
+    b.filter = 'blur(18px) brightness(0.55)'; b.drawImage(im, (W - im.width * z) / 2, (H - im.height * z) / 2, im.width * z, im.height * z); b.filter = 'none';
+  }
+  c.drawImage(COVER_BG, 0, 0);
+  // the full painting, slightly smaller than the screen so the logo has sky above the heroes
+  const z = Math.min(W / im.width, H / im.height) * (0.9 + Math.sin(t * 0.004) * 0.008), w = im.width * z, h = im.height * z, x = (W - w) / 2, y = H - h;
+  c.drawImage(im, x, y, w, h);
+  // feather the painting's edges into the backdrop
+  c.save();
+  const top = c.createLinearGradient(0, y, 0, y + 60); top.addColorStop(0, 'rgba(12,6,8,0.9)'); top.addColorStop(1, 'rgba(12,6,8,0)'); c.fillStyle = top; c.fillRect(x, y, w, 60);
+  if (x > 1) {
+    const l = c.createLinearGradient(x, 0, x + 70, 0); l.addColorStop(0, 'rgba(12,6,8,0.9)'); l.addColorStop(1, 'rgba(12,6,8,0)'); c.fillStyle = l; c.fillRect(x, y, 70, h);
+    const r = c.createLinearGradient(x + w, 0, x + w - 70, 0); r.addColorStop(0, 'rgba(12,6,8,0.9)'); r.addColorStop(1, 'rgba(12,6,8,0)'); c.fillStyle = r; c.fillRect(x + w - 70, y, 70, h);
+  }
+  c.restore();
 }
 function drawTitleCover(c) {
   const t = G.t;
-  coverImage(c, t, 54);
+  coverImage(c, t);
   const top = c.createLinearGradient(0, 0, 0, 260); top.addColorStop(0, 'rgba(10,4,12,0.75)'); top.addColorStop(1, 'rgba(10,4,12,0)');
   c.fillStyle = top; c.fillRect(0, 0, W, 260);
   const bot = c.createLinearGradient(0, 560, 0, H); bot.addColorStop(0, 'rgba(8,4,6,0)'); bot.addColorStop(0.55, 'rgba(8,4,6,0.8)'); bot.addColorStop(1, 'rgba(8,4,6,0.95)');
@@ -425,7 +450,7 @@ function drawTitleCover(c) {
   if (!G.titleReady) {   // splash: big centred logo over a darkened cover
     const v = c.createRadialGradient(W / 2, 300, 60, W / 2, 300, 620); v.addColorStop(0, 'rgba(0,0,0,0.55)'); v.addColorStop(1, 'rgba(0,0,0,0.15)');
     c.fillStyle = v; c.fillRect(0, 0, W, H);
-    drawLogo(c, W / 2, 150 + bob, 500);
+    drawLogo(c, W / 2, 128 + bob, 430);
   } else drawLogo(c, 34 + SAFE.l + 165, 112 + bob, 330);   // lobby: compact logo top-left, PUBG style
   if (!G.titleReady) {
     const a = 0.55 + 0.45 * Math.sin(t * 0.08);

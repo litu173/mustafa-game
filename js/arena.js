@@ -21,14 +21,14 @@ const FFA_COLORS = ['#ff5a46', '#4aa0ff', '#5ad46a', '#ffc83a', '#c46aff', '#ff8
 function colorFor(f) { return G.arena.mode === 'team' ? SIDE_COLORS[f.side] : FFA_COLORS[f.slot % FFA_COLORS.length]; }
 const myFighter = () => G.arena && G.players.find(p => p.mine);
 const fighterById = id => G.players.find(p => p.netId === id);
-const arenaSend = d => Net.send({ t: 'relay', d });
+const arenaSend = d => { if (G.arena && !G.arena.offline) Net.send({ t: 'relay', d }); };   // bot matches stay on this device
 
 /* ---------- start / resume / end ---------- */
 function startArena(msg) {
   if (G.arena && G.arena.roomId === msg.roomId) { setArenaHost(msg.host); return; }   // resumed after a reconnect
-  const me = Net.me.id;
+  const me = msg.offline ? 'me' : Net.me.id;
   G.arena = {
-    mode: msg.mode, host: msg.host, isHost: msg.host === me, me, roomId: msg.roomId, teamNames: msg.teamNames,
+    offline: !!msg.offline, mode: msg.mode, host: msg.host, isHost: msg.host === me, me, roomId: msg.roomId, teamNames: msg.teamNames,
     stage: msg.stage, time: 0, limit: 60 * 60 * 3, ended: false, endT: 0, result: null, sendT: 0,
     itemT: 300, itemSeq: 0, projSeq: 0, offlineSince: 0, startAt: G.t,
   };
@@ -68,7 +68,7 @@ function endArena() {
 }
 function leaveArena() {
   if (!G.arena) return;
-  Net.send({ t: 'roomLeave' });
+  if (!G.arena.offline) Net.send({ t: 'roomLeave' });
   endArena();
 }
 
@@ -105,7 +105,7 @@ function arenaLost(p) {   // only ever called for my own fighter
 }
 function creditKO(by, victim) {
   const killer = fighterById(by);
-  if (killer && killer !== victim) { if (killer.mine) killer.kills++; popText(victim.x, victim.y, 360, 'K.O.!', '#ffd56b', 56); }
+  if (killer && killer !== victim) { if (killer.mine || killer.bot) killer.kills++; popText(victim.x, victim.y, 360, 'K.O.!', '#ffd56b', 56); }
 }
 
 /* ---------- messages from other players ---------- */
@@ -137,17 +137,18 @@ function onArenaRelay(from, d) {
 }
 
 /* ---------- items: the host decides who got there first ---------- */
-function arenaTake(it) {
+function arenaTake(it, who) {
   if ((it.pending || 0) > G.t) return;
   it.pending = G.t + 30;
+  if (who && who.bot) return hostTake(who.netId, it.id);
   if (G.arena.isHost) hostTake(G.arena.me, it.id); else Net.send({ t: 'toHost', d: { k: 'take', id: it.id } });
 }
 function hostTake(by, id) {
   const it = G.items.find(i => i.id === id); if (!it) return;
   G.items = G.items.filter(i => i.id !== id);
   arenaSend({ k: 'it-', id, by });
-  const me = myFighter();
-  if (by === G.arena.me && me) grantItem(me, it);
+  const who = fighterById(by);
+  if (who && (who.mine || who.bot)) grantItem(who, it);
 }
 function grantItem(p, it) {
   if (FOOD[it.kind]) { p.hp = Math.min(p.maxHp, p.hp + FOOD[it.kind]); popText(p.x, p.y, 300, '+' + FOOD[it.kind] + ' HP', '#8dffb0', 40); Sound.play('eat'); }
@@ -178,6 +179,7 @@ function arenaUpdate() {
   if (G.hitstop > 0) G.hitstop--;
   else {
     if (me && me.state !== 'out') updatePlayer(me);
+    if (a.offline) updateBots();
     updateProjectiles();
     G.projs = G.projs.filter(b => !b.remove);
     arenaItems();
@@ -188,7 +190,8 @@ function arenaUpdate() {
   if (a.isHost) hostDuties();
   updateArenaCamera();
   // connection trouble: keep playing locally, give up after the server's grace period
-  if (Net.status !== 'online') { a.offlineSince = a.offlineSince || G.t; if (G.t - a.offlineSince > 60 * 22) { Net.toast('Connection lost.'); endArena(); } }
+  if (a.offline) a.offlineSince = 0;
+  else if (Net.status !== 'online') { a.offlineSince = a.offlineSince || G.t; if (G.t - a.offlineSince > 60 * 22) { Net.toast('Connection lost.'); endArena(); } }
   else a.offlineSince = 0;
 }
 function hostDuties() {
@@ -220,7 +223,7 @@ function checkArenaWin() {
     winners: G.players.filter(p => p.side === winner).map(p => p.name),
     stats: G.players.map(p => ({ id: p.netId, name: p.name, side: p.side, kills: p.kills, deaths: p.deaths, hero: p.def.id })),
   };
-  Net.send({ t: 'matchEnd', result });
+  if (!a.offline) Net.send({ t: 'matchEnd', result });
   showArenaResult(result);
 }
 function showArenaResult(result) {
@@ -290,7 +293,7 @@ function drawArenaTags(c) {
     const x = f.x - G.camX, y = f.y - f.z - 330, col = colorFor(f);
     c.save();
     c.font = '700 20px Teko, sans-serif'; c.textAlign = 'center';
-    const label = f.mine ? 'YOU' : f.name + (f.lagging ? '  ⧖' : ''), w = c.measureText(label).width + 18;
+    const label = f.mine ? 'YOU' : (f.bot ? '\u2699 ' : '') + f.name + (f.lagging ? '  ⧖' : ''), w = c.measureText(label).width + 18;
     c.fillStyle = 'rgba(0,0,0,0.6)'; rrect(c, x - w / 2, y - 22, w, 26, 8); c.fill();
     c.strokeStyle = col; c.lineWidth = 2; c.stroke();
     c.fillStyle = col; c.fillText(label, x, y - 2);
@@ -318,7 +321,7 @@ function drawArenaHUD(c) {
   });
   const left = Math.max(0, Math.ceil((a.limit - a.time) / 60));
   txt(c, `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`, W / 2, 118, { font: '700 40px Teko, sans-serif', align: 'center', fill: left < 20 ? '#ff7a5a' : '#f3dc9a', stroke: '#120800', sw: 5 });
-  if (Net.status !== 'online') txt(c, 'Reconnecting…', W / 2, 160, { font: '700 22px Cinzel, serif', align: 'center', fill: '#ffb0a0', stroke: '#120800', sw: 4 });
+  if (!a.offline && Net.status !== 'online') txt(c, 'Reconnecting…', W / 2, 160, { font: '700 22px Cinzel, serif', align: 'center', fill: '#ffb0a0', stroke: '#120800', sw: 4 });
   if (a.ended && a.result) drawArenaResult(c, a.result);
   else txt(c, 'Esc: leave match', W - 20, H - 14, { font: '600 13px Cinzel, serif', align: 'right', fill: 'rgba(240,220,180,0.6)' });
 }

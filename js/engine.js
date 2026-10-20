@@ -171,6 +171,7 @@ const Sound = {
       case 'bodyfall': this.noise(0.25, 0.7, 'lowpass', 700, 60); this.osc('sine', 80, 30, 0.25, 0.6); break;
       case 'step': this.osc('sine', 70, 30, 0.25, 0.5); this.noise(0.15, 0.35, 'lowpass', 300, 60); break;
       case 'gun': this.noise(0.14, 0.7, 'highpass', 2500, 500); this.osc('square', 200, 50, 0.1, 0.22); this.noise(0.3, 0.2, 'lowpass', 800, 100); break;
+      case 'laser': this.osc('square', 2200 * v, 300, 0.18, 0.07); this.osc('sawtooth', 1400, 200, 0.2, 0.05); this.noise(0.1, 0.15, 'highpass', 5000, 2000); break;
       case 'egun': this.noise(0.12, 0.45, 'bandpass', 1500, 400); this.osc('square', 150, 45, 0.1, 0.15); break;
       case 'pickup': this.arp([660, 880, 1320], 0.05, 'triangle', 0.18); break;
       case 'eat': this.arp([523, 659, 784, 1047], 0.05, 'triangle', 0.18); break;

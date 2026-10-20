@@ -32,18 +32,18 @@ function updSettings() {
   if (nudge && it.type === 'toggle') { Save.d[it.id] = !setVal(it); Save.write(); applySettings(); Sound.play('select'); }
   if (Input.confirm()) activate(it);
   // pointer: tap rows, drag sliders
-  if (G.rects) {
-    if (!m.down) S.drag = -1;
-    for (const R of G.rects) {
-      const inside = m.x >= R.x && m.x <= R.x + R.w && m.y >= R.y && m.y <= R.y + R.h;
-      if (m.click && inside) { S.sel = R.i; if (items[R.i].type === 'slider') S.drag = R.i; else activate(items[R.i]); }
-    }
-    if (S.drag >= 0 && m.down) {
-      const R = G.rects[S.drag], it2 = items[S.drag];
-      const v = clamp((m.x - R.sx) / R.sw, 0, 1);
-      if (Math.abs(v - setVal(it2)) > 0.01) { Save.d[it2.id] = Math.round(v * 20) / 20; applySettings(); }
-    } else if (S.drag === -1 && m.click === false && G.settings.dirty) { Save.write(); }
-    if (S.drag >= 0) G.settings.dirty = true; else if (G.settings.dirty) { G.settings.dirty = false; Save.write(); }
+  if (!G.rects) return;
+  if (!m.down && S.drag >= 0) { S.drag = -1; Save.write(); }
+  for (const R of G.rects) {
+    const inside = m.x >= R.x && m.x <= R.x + R.w && m.y >= R.y && m.y <= R.y + R.h;
+    if (!m.click || !inside) continue;
+    if (R.i === 'close') return closeSettings();
+    S.sel = R.i;
+    if (items[R.i].type === 'slider') S.drag = R.i; else return activate(items[R.i]);   // activate may close the panel
+  }
+  if (S.drag >= 0 && m.down) {
+    const R = G.rects.find(r => r.i === S.drag), it2 = items[S.drag];
+    if (R) { const v = clamp((m.x - R.sx) / R.sw, 0, 1); if (Math.abs(v - setVal(it2)) > 0.01) { Save.d[it2.id] = Math.round(v * 20) / 20; applySettings(); } }
   }
 }
 function activate(it) {
@@ -56,7 +56,8 @@ function drawSettings(c) {
   c.fillStyle = 'rgba(4,3,6,0.88)'; c.fillRect(0, 0, W, H);
   const pw = 760, px = W / 2 - pw / 2, rowH = 64, top = H / 2 - (items.length * rowH) / 2 + 20;
   txt(c, 'SETTINGS', W / 2, top - 40, { font: '900 44px Cinzel, serif', align: 'center', fill: goldGrad(c, top - 76, top - 40), stroke: '#120800', sw: 6 });
-  G.rects = [];
+  G.rects = [{ x: W - 96 - SAFE.r, y: 18, w: 70, h: 70, i: 'close' }];
+  closeX(c, W - 61 - SAFE.r, 53);
   items.forEach((it, i) => {
     const y = top + i * rowH, sel = S.sel === i;
     if (it.type === 'button') {
@@ -83,4 +84,19 @@ function drawSettings(c) {
     }
     G.rects.push(R);
   });
+}
+
+// round ✕ close button used by every full-screen panel
+function closeX(c, x, y) {
+  c.save();
+  c.fillStyle = 'rgba(10,6,4,0.85)'; c.beginPath(); c.arc(x, y, 30, 0, TAU); c.fill();
+  c.strokeStyle = '#d4af37'; c.lineWidth = 2; c.stroke();
+  c.strokeStyle = '#f3dc9a'; c.lineWidth = 4; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x - 11, y - 11); c.lineTo(x + 11, y + 11); c.moveTo(x + 11, y - 11); c.lineTo(x - 11, y + 11); c.stroke();
+  c.restore();
+}
+// does a tap land on a rect with this id?
+function tapped(id) {
+  const m = Input.mouse; if (!m.click || !G.rects) return false;
+  return G.rects.some(R => R.i === id && m.x >= R.x && m.x <= R.x + R.w && m.y >= R.y && m.y <= R.y + R.h);
 }

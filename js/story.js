@@ -5,35 +5,61 @@
    radio chatter, mission fail and the mission select.
    ========================================================= */
 
-/* ---------- story text ---------- */
+/* ---------- story text ({CAPTIVE}, {ALLY}, {HERO} are filled in for the hero you play) ---------- */
 const STORY = {
   prologue: [
-    { bg: 'sea', text: '2002. The Great Flood swallowed the old cities. And from the deep jungles, the dinosaurs came back.' },
-    { bg: 'jungle', text: 'In the hidden Green Valley they nest in peace, guarded by the people of Shobuj Village and their elder, Dada Hakim.' },
-    { bg: 'lab', who: 'kaiser', name: 'DR. KAISER', text: 'Dinosaur blood... brewed into the FANG SERUM. One drop turns a man into a monster. An army of monsters will make me a king.' },
-    { bg: 'village', text: 'Last night the Black Fang gang burned Shobuj Village and kidnapped Dada Hakim. Only he knows the way into the Valley.' },
-    { bg: 'garage', who: 'mustafa', name: 'MUSTAFA', text: 'They took the old man. Rakib, warm up the Cadillac. Nadia, Bablu... we ride at dawn.' },
-    { bg: 'cover', title: 'OPERATION GREEN VALLEY', text: '12 missions. Rescue Dada Hakim. Destroy the serum. End the Black Fang forever.' },
+    { bg: 'sea', text: '2002. Sixty-five million years ago a meteor of living crystal fell on the Green Valley. Its heart, the CHRONO-FANG, still beats beneath the jungle.' },
+    { bg: 'jungle', text: 'Its energy brought the dinosaurs back. In the hidden valley they nest in peace, guarded by the people of Shobuj Village and their elder, Dada Hakim.' },
+    { bg: 'lab', who: 'kaiser', name: 'DR. KAISER', text: 'The Chrono-Fang can tear open time itself. Dinosaur blood, cyber-implants and that crystal... and I will rule every age that ever was.' },
+    { bg: 'village', text: 'Last night the Black Fang burned Shobuj Village and kidnapped Dada Hakim. Only he knows the way to the crystal’s heart.' },
+    { bg: 'garage', who: 'mustafa', name: 'MUSTAFA', text: 'They took the old man. Bolt, fire up the Cadillac. Nova, Titan... we ride at dawn.' },
+    { bg: 'cover', title: 'OPERATION REBORN', text: '14 missions in 5 chapters. Rescue Dada Hakim. Stop Dr. Kaiser before he breaks time itself.' },
   ],
   chapter1: [
-    { bg: 'jungle', who: 'nadia', name: 'NADIA', text: 'Hog Bahadur talked before they dragged him off: the convoy was a decoy. The poachers are already in the Green Valley.' },
-    { bg: 'jungle', who: 'bablu', name: 'BABLU', text: 'Then we go to the Valley. Anyone who touches those nests answers to my fists.' },
+    { bg: 'jungle', who: 'nadia', text: 'Hog Bahadur talked: the convoy was a decoy. Kaiser’s diggers are already in the Green Valley, hunting for the Chrono-Fang.' },
+    { bg: 'jungle', who: 'bablu', text: 'Then we go to the Valley. Anyone who touches those nests answers to my fists.' },
   ],
   chapter2: [
-    { bg: 'garage', look: 'night', text: 'With Butcher Bhola gone, Kaiser loses his supply of blood. And Kaiser strikes back where it hurts.' },
-    { bg: 'garage', who: 'rakib', name: 'RAKIB', text: 'Mustafa... the garage. They are at the garage!' },
+    { bg: 'garage', look: 'night', text: 'With Butcher Bhola gone, Kaiser loses his blood supply. So he strikes where it hurts: our home.' },
+    { bg: 'garage', who: 'rakib', text: 'Mustafa... the garage. They are at the garage!' },
+  ],
+  abduction: [
+    { bg: 'garage', look: 'night', text: 'Saju falls in the storm... but it was only a distraction. When the lightning fades, {CAPTIVE} is gone.' },
+    { bg: 'lab', look: 'alarm', who: 'kaiser', name: 'DR. KAISER', text: 'Your friend {CAPTIVE} will be the first of my cyborg soldiers, Mustafa. Come and watch, if you dare.' },
+    { bg: 'garage', look: 'night', who: 'mustafa', name: 'MUSTAFA', text: 'Hold on, {CAPTIVE}. Nobody gets left behind. Nobody.' },
   ],
   chapter3: [
-    { bg: 'fortress', text: 'A captured biker gives up the secret: the Black Fang fortress sits on the old dam. Hakim, the caged dinosaurs and the serum factory are all inside.' },
-    { bg: 'fortress', who: 'mustafa', name: 'MUSTAFA', text: 'No more running. We end this at the dam.' },
+    { bg: 'fortress', text: 'A captured biker talks: {CAPTIVE} is held in Prison Block Nine, deep beneath the Black Fang dam fortress.' },
+    { bg: 'fortress', who: '{ALLY}', text: 'Searchlights, cyber-raptors, a whole army. Sounds like a good night.' },
+  ],
+  chapter4: [
+    { bg: 'lab', look: 'alarm', who: '{CAPTIVE}', text: 'Kaiser isn’t building an army, Mustafa... he’s bringing one. From sixty-five million years ago. His machine is almost ready.' },
+    { bg: 'jungle', look: 'rift', text: 'Above the Green Valley, the sky begins to split.' },
   ],
   epilogue: [
-    { bg: 'lab', look: 'alarm', text: 'The serum factory burns. Dr. Kaiser’s monster army will never wake.' },
-    { bg: 'jungle', who: 'nadia', name: 'DADA HAKIM', text: 'You saved more than an old man, my son. You saved the Valley. The dinosaurs will remember.' },
-    { bg: 'cover', title: 'MISSION ACCOMPLISHED', text: 'But deep in the ruins, one vial of Fang Serum is missing... TO BE CONTINUED.' },
+    { bg: 'lab', look: 'rift', text: 'The rift collapses with a sound like thunder running backwards. Dr. Kaiser’s army of every age is gone.' },
+    { bg: 'jungle', who: 'hakim', name: 'DADA HAKIM', text: 'You saved more than an old man, my son. You saved time itself. The valley will remember Team Reborn.' },
+    { bg: 'cover', title: 'MISSION ACCOMPLISHED', text: 'But in the ashes of the lab, one shard of the Chrono-Fang is missing... TO BE CONTINUED.' },
   ],
 };
-const CHAPTER_STORY = { 1: 'chapter1', 2: 'chapter2', 3: 'chapter3' };
+const CHAPTER_STORY = { 1: 'chapter1', 2: 'chapter2', 3: 'chapter3', 4: 'chapter4' };
+
+// who gets kidnapped, and who is on the radio, depends on the hero you play
+function playerHeroId() { return (HEROES[G.selIdx] || HEROES[0]).id; }
+function captiveId() { return playerHeroId() === 'nadia' ? 'rakib' : 'nadia'; }
+function allyId() { return ['bablu', 'rakib', 'nadia', 'mustafa'].find(id => id !== playerHeroId() && id !== captiveId()); }
+function heroName(id) { const h = HEROES.find(x => x.id === id); return h ? h.name : String(id).toUpperCase(); }
+function fmt(s) { return String(s || '').replace(/\{CAPTIVE\}/g, heroName(captiveId())).replace(/\{ALLY\}/g, heroName(allyId())).replace(/\{HERO\}/g, heroName(playerHeroId())); }
+// resolve a speaker: placeholders, never yourself, never the kidnapped friend while they are gone
+function resolveWho(who) {
+  if (who === '{ALLY}') return allyId();
+  if (who === '{CAPTIVE}') return captiveId();
+  const missing = G.stageIdx >= 8 && G.stageIdx <= 10 && !G.story;   // between the kidnapping and the rescue
+  if (who === playerHeroId() || (missing && who === captiveId())) return allyId();
+  return who;
+}
+const SPEAKER = { captain: 'FANG CAPTAIN', butcher: 'BUTCHER BHOLA', saju: 'SHADOW SAJU', morgol: 'MORGOL', kaiser: 'DR. KAISER', hakim: 'DADA HAKIM' };
+function speakerName(id) { return SPEAKER[id] || heroName(id); }
 
 /* ---------- objective targets ---------- */
 const OBJ_PROPS = {
@@ -42,6 +68,9 @@ const OBJ_PROPS = {
   lock: { hp: 5, label: 'CAGE LOCK', done: 'DINOSAUR FREED!' },
   cage: { hp: 4, label: 'CAGE', done: 'BABY FREED!' },
   hut: { hp: 5, label: 'TRAPPED VILLAGERS', done: 'VILLAGERS SAVED!' },
+  core: { hp: 6, label: 'POWER CORE', done: 'CORE OFFLINE!' },
+  capsule: { hp: 8, label: '{CAPTIVE}’S CAPSULE', done: '{CAPTIVE} IS FREE!' },
+  pylon: { hp: 7, label: 'RIFT PYLON', done: 'PYLON DOWN!' },
 };
 
 const Mission = {
@@ -120,7 +149,7 @@ const Mission = {
     const m = G.mission; if (!m) return;
     const info = OBJ_PROPS[pr.kind];
     m.done++;
-    popText(pr.x, pr.y, 260, info.done, '#7dff9a', 34);
+    popText(pr.x, pr.y, 260, fmt(info.done), '#7dff9a', 34);
     addScore(1500);
     G.shake = Math.max(G.shake, 10);
     if (pr.kind === 'tank') { explodeFx(pr.x, pr.y, 80, 160); Sound.play('boom'); for (let i = 0; i < 18; i++) addPart({ type: 'spark', x: pr.x + rand(-40, 40), y: pr.y, z: rand(40, 200), vx: rand(-8, 8), vz: rand(2, 12), life: 40, color: '#7dff6a' }); }
@@ -128,6 +157,9 @@ const Mission = {
     else Sound.play('break');
     if (pr.kind === 'cage') m.freed.push({ kind: 'cage', x: pr.x, y: pr.y, vx: 7, t: 0 });
     if (pr.kind === 'lock') { m.freed.push({ kind: 'lock', x: pr.x, y: pr.y + 10, vx: 6, t: 0 }); Sound.play('roar'); }
+    if (pr.kind === 'capsule') { m.freed.push({ kind: 'captive', id: captiveId(), x: pr.x, y: pr.y + 10, vx: -3, t: 0 }); Sound.play('fanfare'); this.say(captiveId(), 'Took you long enough! Now let me at them!'); return; }
+    if (pr.kind === 'pylon') { explodeFx(pr.x, pr.y, 120, 180); Sound.play('boom'); G.flash = 10; G.flashCol = '#c86aff'; }
+    if (pr.kind === 'core') { explodeFx(pr.x, pr.y, 100, 140); Sound.play('boom'); }
     if (pr.kind === 'hut') for (let i = 0; i < 3; i++) m.freed.push({ kind: 'hut', x: pr.x + i * 40, y: pr.y + 20 + i * 18, vx: -4.5 - i * 0.6, t: -i * 12, who: i });
     Sound.play('objective');
     const left = m.total - m.done;
@@ -136,6 +168,7 @@ const Mission = {
   },
   say(who, text) {
     const m = G.mission; if (!m) return;
+    who = resolveWho(who); text = fmt(text);
     m.radio = { who, text, t: 0, dur: Math.max(170, text.length * 4 + 80) };
     Sound.play('radio');
   },
@@ -163,8 +196,8 @@ function afterClear() {
   Save.write();
   if (i >= STAGES.length - 1) { playStory('epilogue', () => { G.scene = 'ending'; G.sceneT = 0; Music.play('victory'); saveBest(); }); return; }
   const next = i + 1, ch = STAGES[next].chapter;
-  if (ch !== STAGES[i].chapter && CHAPTER_STORY[ch]) playStory(CHAPTER_STORY[ch], () => openBrief(next));
-  else openBrief(next);
+  const go = () => { if (ch !== STAGES[i].chapter && CHAPTER_STORY[ch]) playStory(CHAPTER_STORY[ch], () => openBrief(next)); else openBrief(next); };
+  if (STAGES[i].after) playStory(STAGES[i].after, go); else go();
 }
 
 /* ---------- cutscenes ---------- */
@@ -175,7 +208,7 @@ function playStory(id, done) {
 }
 function updStory() {
   const s = G.story, p = s.panels[s.i];
-  s.t++; s.chars = Math.min(p.text.length, s.chars + 1.4);
+  s.t++; s.chars = Math.min(fmt(p.text).length, s.chars + 1.4);
   const tap = Input.confirm() || Input.mouse.click;
   if (G.rects && Input.mouse.click) for (const R of G.rects) {
     const m = Input.mouse;
@@ -183,7 +216,7 @@ function updStory() {
   }
   if (Input.hit('back')) return endStory();
   if (tap && s.t > 10) {
-    if (s.chars < p.text.length) s.chars = p.text.length;
+    if (s.chars < fmt(p.text).length) s.chars = fmt(p.text).length;
     else { Sound.play('page'); s.i++; s.t = 0; s.chars = 0; if (s.i >= s.panels.length) endStory(); }
   }
 }
@@ -215,21 +248,22 @@ function drawStory(c) {
     c.restore();
   }
   let tx = 120;
-  if (p.who) {
+  const who = p.who && resolveWho(p.who);
+  if (who) {
     c.save(); c.beginPath(); c.arc(170, H - 170, 70, 0, TAU); c.fillStyle = '#140c08'; c.fill(); c.clip();
-    if (!drawPortraitSpr(c, p.who, 170, H - 170, 70)) { c.fillStyle = '#3a2614'; c.fillRect(100, H - 240, 140, 140); }
+    if (!drawPortraitSpr(c, who, 170, H - 170, 70)) { c.fillStyle = '#3a2614'; c.fillRect(100, H - 240, 140, 140); }
     c.restore();
     c.lineWidth = 3; c.strokeStyle = goldGrad(c, H - 240, H - 100); c.beginPath(); c.arc(170, H - 170, 70, 0, TAU); c.stroke();
-    txt(c, p.name || p.who.toUpperCase(), 270, H - 214, { font: '900 22px Cinzel, serif', fill: '#f3cf6a', stroke: '#120800', sw: 4 });
+    txt(c, p.name || speakerName(who), 270, H - 214, { font: '900 22px Cinzel, serif', fill: '#f3cf6a', stroke: '#120800', sw: 4 });
     tx = 270;
   }
-  wrapText(c, p.text.slice(0, Math.floor(s.chars)), tx, p.who ? H - 176 : H - 196, W - tx - 110, 34, { font: '600 24px Cinzel, serif', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.85)', sw: 4 });
+  wrapText(c, fmt(p.text).slice(0, Math.floor(s.chars)), tx, who ? H - 176 : H - 196, W - tx - 110, 34, { font: '600 24px Cinzel, serif', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.85)', sw: 4 });
   // progress dots + controls
   s.panels.forEach((_, i) => { c.fillStyle = i === s.i ? '#f3cf6a' : 'rgba(243,207,106,0.3)'; c.beginPath(); c.arc(W / 2 - (s.panels.length - 1) * 11 + i * 22, H - 32, 5, 0, TAU); c.fill(); });
   G.rects = [{ x: W - 170, y: 14, w: 150, h: 40, i: 'skip' }];
   panel(c, W - 170, 14, 150, 40, { r: 20, noInner: true, top: 'rgba(20,12,6,0.8)', bot: 'rgba(10,6,4,0.8)', border: 'rgba(212,175,55,0.6)' });
   txt(c, 'SKIP  »', W - 95, 41, { font: '700 17px Cinzel, serif', align: 'center', fill: '#f3dc9a' });
-  if (s.chars >= p.text.length && (G.t >> 4) % 2) txt(c, (TOUCH ? 'TAP' : 'ENTER') + '  ▸', W - 120, H - 96, { font: '700 18px Cinzel, serif', align: 'right', fill: '#f3dc9a' });
+  if (s.chars >= fmt(p.text).length && (G.t >> 4) % 2) txt(c, (TOUCH ? 'TAP' : 'ENTER') + '  ▸', W - 120, H - 96, { font: '700 18px Cinzel, serif', align: 'right', fill: '#f3dc9a' });
 }
 function wrapText(c, s, x, y, maxW, lh, o) {
   c.font = o.font;
@@ -268,12 +302,12 @@ function drawBrief(c) {
   txt(c, 'CHAPTER ' + (st.chapter + 1) + '  ·  ' + CHAPTERS[st.chapter], 70, 120, { font: '700 20px Cinzel, serif', fill: '#bfae86' });
   txt(c, 'MISSION ' + (i + 1), 70, 168, { font: '700 30px Teko, sans-serif', fill: '#f3cf6a' });
   txt(c, st.name, 70, 230, { font: '900 64px Cinzel, serif', fill: goldGrad(c, 180, 230), stroke: '#120800', sw: 7 });
-  txt(c, st.sub, 72, 268, { font: '600 20px Cinzel, serif', fill: '#efe3c8' });
-  wrapText(c, st.brief || '', 72, 330, 640, 32, { font: '600 21px Cinzel, serif', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.6)', sw: 3 });
+  txt(c, fmt(st.sub), 72, 268, { font: '600 20px Cinzel, serif', fill: '#efe3c8' });
+  wrapText(c, fmt(st.brief), 72, 330, 640, 32, { font: '600 21px Cinzel, serif', fill: '#fff4d6', stroke: 'rgba(0,0,0,0.6)', sw: 3 });
   // objectives card
   panel(c, 70, 470, 660, st.timer ? 150 : 118, { r: 14 });
   txt(c, 'OBJECTIVE', 98, 506, { font: '900 16px Cinzel, serif', fill: '#bfae86' });
-  txt(c, (OBJ_ICON[st.obj.type] || '◆') + '  ' + st.obj.text, 98, 548, { font: '700 23px Cinzel, serif', fill: '#f3dc9a' });
+  txt(c, (OBJ_ICON[st.obj.type] || '◆') + '  ' + fmt(st.obj.text), 98, 548, { font: '700 23px Cinzel, serif', fill: '#f3dc9a' });
   txt(c, 'Difficulty: ' + DIF().name + '   ·   Lives: ' + (Save.d.premium ? 5 : 3), 98, 576, { font: '600 16px Cinzel, serif', fill: '#bfae86' });
   if (st.timer) txt(c, '⏱  Time limit ' + Math.floor(st.timer / 60) + ':' + String(st.timer % 60).padStart(2, '0'), 98, 604, { font: '700 18px Cinzel, serif', fill: '#ff9a7a' });
   c.restore();
@@ -342,6 +376,7 @@ function drawMissionSelect(c) {
     txt(c, OBJ_ICON[s.obj.type] || '', x + cw - 16, y + 32, { font: '700 22px serif', align: 'right', fill: '#f3dc9a' });
     txt(c, lock ? '🔒  LOCKED' : s.name, x + cw / 2, y + chh - 18, { font: `900 ${s.name.length > 16 ? 14 : 16}px Cinzel, serif`, align: 'center', fill: lock ? '#8a7a5c' : sel ? '#f3cf6a' : '#e8dcc0', stroke: '#120800', sw: 4 });
   });
+  G.rects.push({ x: W - 96 - SAFE.r, y: 18, w: 70, h: 70, i: 'close' }); closeX(c, W - 61 - SAFE.r, 53);
   txt(c, Save.d.premium ? 'Royal Pass: every mission unlocked' : 'Finish a mission to unlock the next  ·  Royal Pass unlocks all', W / 2, H - 40, { font: '600 16px Cinzel, serif', align: 'center', fill: '#bfae86' });
 }
 
@@ -349,7 +384,7 @@ function drawMissionSelect(c) {
 function drawMissionHUD(c) {
   const m = G.mission; if (!m || G.arena) return;
   const st = m.st, cx = W / 2;
-  let label = st.obj.text;
+  let label = fmt(st.obj.text);
   if (m.total) label += `   ${m.done}/${m.total}`;
   c.font = '700 17px Cinzel, serif';
   const w = Math.min(W - 760, c.measureText(label).width + 70);
@@ -374,7 +409,7 @@ function drawMissionHUD(c) {
     const d = Math.round((next.x - G.camX - W) / 10);
     const bx = W - 70 + Math.sin(G.t * 0.15) * 6;
     txt(c, '➤', bx, 420, { font: '900 44px serif', align: 'center', fill: '#7dff9a', stroke: '#0a2a10', sw: 5 });
-    txt(c, OBJ_PROPS[next.kind].label + '  ' + d + 'm', bx - 30, 460, { font: '700 15px Cinzel, serif', align: 'right', fill: '#7dff9a', stroke: '#000', sw: 4 });
+    txt(c, fmt(OBJ_PROPS[next.kind].label) + '  ' + d + 'm', bx - 30, 460, { font: '700 15px Cinzel, serif', align: 'right', fill: '#7dff9a', stroke: '#000', sw: 4 });
   }
   drawRadio(c);
 }
@@ -385,12 +420,11 @@ function drawRadio(c) {
   const x = W / 2 - 330, y = 150 + (1 - Math.min(1, r.t / 10)) * -20, w = 660, h = 84;
   panel(c, x, y, w, h, { r: 14, top: 'rgba(14,20,14,0.9)', bot: 'rgba(6,10,6,0.9)', border: 'rgba(125,255,154,0.55)' });
   c.save(); c.beginPath(); c.arc(x + 46, y + h / 2, 32, 0, TAU); c.fillStyle = '#0a140a'; c.fill(); c.clip();
-  drawPortraitSpr(c, r.who === 'captain' ? 'razor' : r.who, x + 46, y + h / 2, 32);
+  drawPortraitSpr(c, r.who, x + 46, y + h / 2, 32);
   c.restore();
   c.strokeStyle = '#7dff9a'; c.lineWidth = 2; c.beginPath(); c.arc(x + 46, y + h / 2, 32, 0, TAU); c.stroke();
-  const names = { captain: 'FANG CAPTAIN', butcher: 'BUTCHER BHOLA', saju: 'SHADOW SAJU', morgol: 'MORGOL', kaiser: 'DR. KAISER' };
-  const enemy = !!names[r.who];
-  txt(c, (names[r.who] || r.who.toUpperCase()) + (enemy ? '' : '  ·  RADIO'), x + 92, y + 30, { font: '900 15px Cinzel, serif', fill: enemy ? '#ff7a5a' : '#7dff9a' });
+  const enemy = !!SPEAKER[r.who] && r.who !== 'hakim';
+  txt(c, speakerName(r.who) + (enemy ? '' : '  ·  RADIO'), x + 92, y + 30, { font: '900 15px Cinzel, serif', fill: enemy ? '#ff7a5a' : '#7dff9a' });
   const shown = r.text.slice(0, Math.floor(r.t * 1.6));
   wrapText(c, shown, x + 92, y + 58, w - 110, 22, { font: '600 17px Cinzel, serif', fill: '#efe3c8' });
   // radio waveform
@@ -444,6 +478,41 @@ function drawObjProp(c, pr, x, y) {
       c.save(); c.globalCompositeOperation = 'lighter'; glow(c, w / 2 - 14, ly + 12, 44, `rgba(255,210,80,${0.3 + 0.2 * Math.sin(t * 0.2)})`); c.restore();
       break;
     }
+    case 'core': {
+      c.fillStyle = '#20262e'; c.fillRect(-56, -40, 112, 40); c.fillRect(-46, -230, 92, 22);
+      c.strokeStyle = '#8a929c'; c.lineWidth = 6; line(c, -40, -40, -40, -210); line(c, 40, -40, 40, -210);
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const pr2 = 40 + Math.sin(t * 0.2) * 5 - dmg * 12;
+      const og = c.createRadialGradient(0, -125, 4, 0, -125, pr2); og.addColorStop(0, fl ? '#fff' : 'rgba(220,255,255,1)'); og.addColorStop(0.4, 'rgba(60,220,255,0.9)'); og.addColorStop(1, 'rgba(20,120,255,0)');
+      c.fillStyle = og; c.beginPath(); c.arc(0, -125, pr2, 0, TAU); c.fill();
+      for (let i = 0; i < 3; i++) { const a2 = t * 0.08 + i * 2.1; c.strokeStyle = 'rgba(120,230,255,0.6)'; c.lineWidth = 2; c.beginPath(); c.ellipse(0, -125, 58, 18, a2, 0, TAU); c.stroke(); }
+      c.restore();
+      break;
+    }
+    case 'capsule': {
+      const key = captiveId() + '_a';
+      c.fillStyle = '#1a2028'; c.fillRect(-70, -30, 140, 30); c.fillRect(-70, -320, 140, 26);
+      if (spritesReady(key)) { c.save(); c.globalAlpha = 0.9; c.filter = 'saturate(0.4) brightness(1.1) hue-rotate(150deg)'; drawSprite(c, key, 0, 0, -36, -1, spriteScale(captiveId()) * 0.85); c.filter = 'none'; c.restore(); }
+      const gg = c.createLinearGradient(-60, 0, 60, 0); gg.addColorStop(0, 'rgba(80,220,255,0.18)'); gg.addColorStop(0.5, 'rgba(180,250,255,0.42)'); gg.addColorStop(1, 'rgba(80,220,255,0.18)');
+      c.fillStyle = fl ? 'rgba(255,255,255,0.8)' : gg; c.fillRect(-60, -294, 120, 264);
+      c.strokeStyle = '#9fe8ff'; c.lineWidth = 3; c.strokeRect(-60, -294, 120, 264);
+      if (dmg > 0) { c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 2; for (let i = 0; i < dmg * 10; i++) { const a2 = i * 1.3; line(c, Math.cos(a2) * 6, -170 + Math.sin(a2) * 20, Math.cos(a2) * 58, -170 + Math.sin(a2) * 120); } }
+      for (let i = 0; i < 6; i++) { const by = -40 - ((t * 1.4 + i * 44) % 250); c.fillStyle = 'rgba(220,255,255,0.6)'; c.beginPath(); c.arc(-40 + i * 16, by, 3, 0, TAU); c.fill(); }
+      break;
+    }
+    case 'pylon': {
+      c.fillStyle = fl ? '#fff' : '#2a2238'; c.beginPath(); c.moveTo(-34, 0); c.lineTo(34, 0); c.lineTo(14, -270); c.lineTo(-14, -270); c.closePath(); c.fill();
+      c.strokeStyle = '#c86aff'; c.lineWidth = 2; c.stroke();
+      c.save(); c.globalCompositeOperation = 'lighter';
+      glow(c, 0, -280, 60 + Math.sin(t * 0.3) * 10, 'rgba(200,100,255,0.8)');
+      c.strokeStyle = 'rgba(220,160,255,0.85)'; c.lineWidth = 2.5; c.beginPath();
+      let ax = 0, ay = -280; c.moveTo(ax, ay);
+      for (let i = 0; i < 7; i++) { ax += rand(-26, 26); ay -= 40; c.lineTo(ax, ay); }
+      c.stroke();
+      for (let i = 0; i < 5; i++) { c.fillStyle = 'rgba(200,120,255,0.7)'; c.fillRect(-4, -40 - i * 50 - ((t * 2) % 50), 8, 14); }
+      c.restore();
+      break;
+    }
     case 'hut': {
       c.fillStyle = fl ? '#fff' : '#5a3a1e'; c.fillRect(-60, -170, 120, 170);
       c.fillStyle = '#3a2410'; for (let i = 0; i < 6; i++) c.fillRect(-60 + i * 21, -170, 3, 170);
@@ -460,7 +529,7 @@ function drawObjProp(c, pr, x, y) {
   }
   // health pips + a bouncing marker so targets are obvious
   if (!pr.remove) {
-    const top = { jammer: -300, tank: -290, lock: -270, cage: -170, hut: -280 }[pr.kind], by = top + Math.sin(t * 0.12) * 6;
+    const top = { jammer: -300, tank: -290, lock: -270, cage: -170, hut: -280, core: -250, capsule: -340, pylon: -330 }[pr.kind], by = top + Math.sin(t * 0.12) * 6;
     txt(c, '▼', 0, by, { font: '900 30px serif', align: 'center', fill: '#7dff9a', stroke: '#0a2a10', sw: 4 });
     for (let i = 0; i < info.hp; i++) { c.fillStyle = i < pr.hp ? '#7dff9a' : 'rgba(125,255,154,0.2)'; c.fillRect(-info.hp * 7 + i * 14, by + 10, 10, 6); }
   }
@@ -478,6 +547,11 @@ function drawMissionWorld(c) {
     c.save(); c.globalAlpha = a;
     if (f.kind === 'cage' && has('raptor_r')) { const p = f.t * 0.45, i = Math.floor(p) % 8; drawSprite(c, 'raptor_r', i, x, f.y, 1, 0.42); }
     else if (f.kind === 'lock' && has('trike_w')) { const i = Math.floor(f.t * 0.3) % 8; drawSprite(c, 'trike_w', i, x, f.y, 1, 0.75 * ((window.ATLAS_NORM || {}).trike_w || 1)); }
+    else if (f.kind === 'captive') {
+      const key = f.id + '_c';
+      if (has(key)) { const n = window.ATLAS[key].length, i = Math.floor(f.t * 0.3) % n; drawSprite(c, key, i, x, f.y, -1, spriteScale(f.id) * ((window.ATLAS_NORM || {})[key] || 1)); }
+      if (f.t < 90) txt(c, heroName(f.id) + ' IS FREE!', x, f.y - 330, { font: '900 22px Cinzel, serif', align: 'center', fill: '#9fe8ff', stroke: '#001018', sw: 5 });
+    }
     else if (f.kind === 'hut') {
       const key = ['nadia_c', 'rakib_c', 'bablu_c'][f.who % 3];
       if (has(key)) {

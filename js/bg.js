@@ -454,6 +454,7 @@ function drawPanoramaLive(c, img, cam, theme, t, st) {
   const cut = (BG_CUT[theme] || 0.5) * H, far = cam * BG_FAR, band = 36;
   panoBand(c, img, far, 0, cut + band, 1);                // distant scenery
   drawSkyLife(c, theme, far, t, st, cut);                 // clouds, birds, water, falls...
+  if (st && st.look === 'rift') drawRift(c, t, cut);
   // the near floor, faded in over a soft seam so the two layers never show a hard edge
   const steps = 6;
   for (let i = 0; i < steps; i++) {
@@ -574,6 +575,20 @@ function drawFloorLife(c, theme, cam, t, st, cut) {
     c.restore();
   }
 }
+// a swirling tear in time above the battlefield
+function drawRift(c, t, cut) {
+  const cx = W * 0.62, cy = cut * 0.36, R = Math.min(260, cut * 0.42);
+  c.save(); c.globalCompositeOperation = 'lighter';
+  const core = c.createRadialGradient(cx, cy, 0, cx, cy, R * 1.3); core.addColorStop(0, 'rgba(255,240,255,0.95)'); core.addColorStop(0.18, 'rgba(210,120,255,0.8)'); core.addColorStop(0.55, 'rgba(110,40,220,0.35)'); core.addColorStop(1, 'rgba(60,10,160,0)');
+  c.fillStyle = core; c.beginPath(); c.ellipse(cx, cy, R * 1.3, R * 0.75, -0.2, 0, TAU); c.fill();
+  for (let arm = 0; arm < 5; arm++) {
+    c.strokeStyle = `rgba(${200 + arm * 10},${120 + arm * 20},255,${0.35 - arm * 0.04})`; c.lineWidth = 6 - arm; c.beginPath();
+    for (let i = 0; i <= 60; i++) { const k = i / 60, a = t * 0.02 + arm * 1.256 + k * 5.5, r = R * (1 - k) * 1.1; const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.55; i ? c.lineTo(x, y) : c.moveTo(x, y); }
+    c.stroke();
+  }
+  if ((t % 90) < 6) { c.strokeStyle = 'rgba(240,200,255,0.9)'; c.lineWidth = 3; c.beginPath(); let x = cx + rand(-R, R) * 0.6, y = cy; c.moveTo(x, y); for (let i = 0; i < 6; i++) { x += rand(-40, 40); y += rand(30, 60); c.lineTo(x, y); } c.stroke(); }
+  c.restore();
+}
 function gradeLook(c, look, t) {
   if (!look) return;
   c.save();
@@ -583,6 +598,9 @@ function gradeLook(c, look, t) {
   } else if (look === 'dusk') {
     c.globalCompositeOperation = 'multiply'; c.fillStyle = '#c9a0b8'; c.fillRect(0, 0, W, H);
     c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(80,30,10,0.12)'; c.fillRect(0, 0, W, H);
+  } else if (look === 'rift') {
+    c.globalCompositeOperation = 'multiply'; c.fillStyle = '#a890c8'; c.fillRect(0, 0, W, H);
+    c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(140,60,255,${0.05 + 0.04 * Math.sin(t * 0.05)})`; c.fillRect(0, 0, W, H);
   } else if (look === 'alarm') {
     c.globalCompositeOperation = 'multiply'; c.fillStyle = '#d8b8b8'; c.fillRect(0, 0, W, H);
     c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(255,20,10,${0.06 + 0.06 * Math.max(0, Math.sin(t * 0.08))})`; c.fillRect(0, 0, W, H);
