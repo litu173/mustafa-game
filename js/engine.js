@@ -203,6 +203,7 @@ const Sound = {
       case 'page': this.noise(0.18, 0.12, 'bandpass', 2500, 800); break;
       case 'deploy': Music.stinger('deploy'); break;
       case 'objective': Music.stinger('objective'); break;
+      case 'bite': this.noise(0.12, 0.6, 'bandpass', 900, 300); this.osc('sawtooth', 240, 90, 0.12, 0.25); break;
       case 'radio': this.noise(0.12, 0.18, 'bandpass', 1800, 1200); this.osc('square', 1400, 0, 0.04, 0.05); this.osc('square', 1900, 0, 0.04, 0.05, null, this.ac.currentTime + 0.06); break;
       case 'static': this.noise(0.5, 0.3, 'bandpass', 3000, 900); break;
       case 'alarm': for (let i = 0; i < 3; i++) this.osc('sawtooth', 520, 880, 0.28, 0.06, null, this.ac.currentTime + i * 0.32); break;
@@ -210,10 +211,8 @@ const Sound = {
       case 'roar': this.osc('sawtooth', 130 * v, 38, 0.9, 0.35); this.osc('square', 95 * v, 30, 0.9, 0.15); this.noise(0.9, 0.5, 'lowpass', 900, 120); break;
       case 'laugh': for (let i = 0; i < 4; i++) this.osc('sawtooth', 180 - i * 12, 140 - i * 10, 0.1, 0.07, null, this.ac.currentTime + i * 0.13); break;
       case 'counter': this.osc('sawtooth', 300, 80, 0.3, 0.12); this.noise(0.2, 0.5, 'lowpass', 1500, 200); break;
-      case 'ko': {   // a real K.O.: double impact, glass-like crack, sub drop and the "ta-da ta-da ta-da BOOM" stinger
-        const t = this.ac.currentTime;
-        this.osc('sine', 220, 28, 1.2, 1); this.noise(0.9, 0.8, 'lowpass', 2400, 50);
-        this.noise(0.12, 0.6, 'highpass', 4000, 2000); this.osc('sine', 160, 25, 1.4, 0.9, null, t + 0.12);
+      case 'ko': {   // a K.O.: one solid punch of impact, then the victory fanfare
+        this.osc('sine', 180, 45, 0.45, 0.9); this.noise(0.35, 0.7, 'lowpass', 2600, 300);
         Music.stinger('ko'); break;
       }
       case 'break': this.noise(0.28, 0.7, 'bandpass', 1300, 250); this.osc('triangle', 300, 90, 0.15, 0.2); break;

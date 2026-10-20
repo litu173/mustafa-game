@@ -321,19 +321,22 @@ const Music = {
     const t = ac.currentTime + 0.02, F = s => 440 * Math.pow(2, (s + N('D')) / 12);
     const duck = (len) => { this.duck.gain.cancelScheduledValues(t); this.duck.gain.setTargetAtTime(0.15, t, 0.03); this.duck.gain.setTargetAtTime(1, t + len, 0.4); };
     switch (name) {
-      case 'ko': {   // "ta-da ta-da ta-da — BOOM": triplet brass stabs climbing into a huge impact
-        duck(3.2);
-        const stab = 0.11;
-        [[0, 3], [5, 8], [10, 12]].forEach((pair, i) => pair.forEach((n, j) => {
-          const tt = t + i * stab * 2.2 + j * stab;
-          for (const iv of [0, 7, 12]) this.brass(F(n + iv - 12), tt, stab * 0.8, 0.07, true);
-          this.taiko(tt, j ? 0.6 : 0.9, j ? 1.3 : 1, true);
-        }));
-        const big = t + 3 * stab * 2.2;
-        this.boom(big, 1.2); this.crash(big, 0.5, true);
-        for (const iv of [0, 3, 7, 12, 15]) this.brass(F(iv), big, 1.4, 0.06, true);
-        for (const iv of [0, 7, 12]) this.choir(F(iv), big, 1.6, 0.07, true);
-        for (let i = 0; i < 4; i++) this.taiko(big + i * 0.09, 1, 0.8, true);
+      case 'ko': {   // victory fanfare: "ta-ta-ta TAAA — ta-da-da DAAA!" in a bright major key
+        duck(3.4);
+        const s = 0.12, M = (n, tt, d, v = 0.075) => { for (const iv of [0, 12]) this.brass(F(n + iv), tt, d, v, true); this.brass(F(n - 5), tt, d, v * 0.6, true); };
+        // pickup triplet on the fifth, then the tonic held
+        [0, 1, 2].forEach(i => { M(7, t + i * s, s * 0.75); this.taiko(t + i * s, 0.45, 1.4, true); });
+        M(12, t + 3 * s, s * 2.6); this.taiko(t + 3 * s, 0.8, 1.1, true);
+        // climbing answer: third, fifth... onto the high tonic
+        const b = t + 3 * s + s * 3;
+        M(16, b, s * 0.8); M(19, b + s, s * 0.8);
+        const top = b + 2 * s;
+        // the big major chord with cymbals, choir and a rising timpani roll
+        for (const iv of [0, 4, 7, 12, 16, 19, 24]) this.brass(F(iv), top, 1.6, 0.05, true);
+        for (const iv of [12, 16, 19]) this.choir(F(iv), top, 1.8, 0.06, true);
+        this.crash(top, 0.6, true); this.crash(top + 0.9, 0.25, true);
+        for (let i = 0; i < 8; i++) this.taiko(top - 0.32 + i * 0.04, 0.35 + i * 0.07, 1.2, true);
+        this.taiko(top, 1, 0.9, true);
         break;
       }
       case 'boss': {   // the horn: a huge low brass blast as a boss walks in

@@ -218,7 +218,7 @@ function isFinalKill(t) {
 // the big finish: slow motion, white flash, shockwave, fire burst and the "ta-da ta-da ta-da BOOM"
 function bigKO(t, sub) {
   G.slowmo = 120; G.flash = 20; G.flashCol = '#ffffff'; G.shake = 22; G.hitstop = 10;
-  Sound.play('ko'); Sound.play('boom');
+  Sound.play('ko');
   G.banner = { title: 'K.O.!', sub, t: 0, dur: 150, big: true };
   const z = 120 * (t.scale || 1);
   addPart({ type: 'ring', x: t.x, y: t.y, z: 2, life: 30, size: 420, color: '#ffe9a8', flat: true });
@@ -725,10 +725,10 @@ function updateDrive() {
     if (p.boostCool > 0) p.boostCool--;
     if (p.boostT > 0) p.boostT--;
     if (Input.hit('atk') && p.boostCool <= 0) { p.boostT = 20; p.boostCool = 55; Sound.play('whoosh'); }
-    p.x += d.speed + ix * 7 + (p.boostT > 0 ? 9 : 0); p.y += iy * 5;
-    p.x = clamp(p.x, G.camX + 470, G.camX + W - 500);   // the 910 px Cadillac stays on screen p.y = clamp(p.y, 520, 690);
+    driveFeel(p, d, ix, iy);
+    p.x = clamp(p.x, G.camX + 470, G.camX + W - 500); p.y = clamp(p.y, 520, 690);   // the 910 px Cadillac stays on screen and on the road
     p.walkPh += 0.5;
-    if (G.t % 3 === 0) addPart({ type: 'dust', x: p.x - 430, y: p.y, z: 8, vx: -3, vz: 0.6, life: 26, size: 20, color: 'rgba(220,190,150,' });
+    passengerGun(p);
     // run over anything in front of the bumper
     for (const e of G.enemies) {
       if (e.def.rider || !e.canBeHit) continue;
@@ -739,20 +739,15 @@ function updateDrive() {
       }
     }
     for (const pr of G.props) {
-      if (!pr.remove && pr.x - p.x > -455 && pr.x - p.x < 475 && Math.abs(pr.y - p.y) < 44) { hitProp(pr); hitProp(pr); Sound.play('crash'); }
+      if (!pr.remove && pr.x - p.x > -455 && pr.x - p.x < 475 && Math.abs(pr.y - p.y) < 44) {
+        hitProp(pr); hitProp(pr); Sound.play('crash'); p.bv -= 3;
+        if (pr.kind === 'rock' && p.inv <= 0) { p.hp = Math.max(0, p.hp - 6 * DIF().dmg); p.flash = 8; p.inv = 20; G.shake = 9; if (p.hp <= 0) { p.setState('dead'); p.t = 0; } }   // boulders hurt, barrels just fly
+      }
     }
   }
-  // traffic: gang runners, rock throwers, barrels and food on the road
+  // the road's set pieces: bikers, raptor stampede, rockslide, nitro run (js/drive.js)
   if (!d.bossOn) {
-    if (--d.spawnT <= 0) {
-      d.spawnT = rand(26, 56);
-      const r = Math.random(), y = rand(520, 690), x = G.camX + W + 120;
-      if (r < 0.6) {
-        const e = makeEnemy(Math.random() < 0.5 ? 'razor' : 'biker', x, y);
-        e.runner = true; e.thrower = Math.random() < 0.35; e.cool = rand(10, 60); G.enemies.push(e);
-      } else if (r < 0.85) G.props.push(makeProp(x, y, Math.random() < 0.5 ? 'barrel' : 'crate', Math.random() < 0.25 ? pick(['pizza', 'hotdog', 'meat']) : null));
-      else spawnItem(pick(['pizza', 'hotdog', 'apple', 'gem']), x, y);
-    }
+    driveSpawns(st, d, p);
     if (G.camX >= st.len) {
       d.bossOn = true;
       const hog = makeEnemy('hog', G.camX + W + 250, 600);
@@ -761,6 +756,7 @@ function updateDrive() {
       Music.play('boss', st.transpose || 0); Sound.play('roar');
     }
   }
+  updateRocks(d, p);
   for (const pr of G.props) if (pr.x < G.camX - 250) pr.remove = true;
   for (const it of G.items) if (it.x < G.camX - 250) it.remove = true;
   if (d.clearT > 0 && --d.clearT === 0) stageClear();
@@ -952,7 +948,7 @@ function loadStage(i) {
   G.players = [p];
   G.drive = null;
   if (st.drive) {
-    G.drive = { speed: 11, spawnT: 60, bossOn: false, clearT: 0 };
+    G.drive = { speed: 11, spawnT: 60, bossOn: false, clearT: 0, rocks: [], section: null };
     p.setState('drive'); p.x = 420; p.y = 610;
   }
   Mission.init(st);
@@ -1110,7 +1106,7 @@ function updPlay() {
   if (G.scene !== 'play') return false;
   if (G.t % 20 === 0) assignAggro();
   for (const e of G.enemies) {
-    if (e.runner && (e.state === 'idle' || e.state === 'walk')) { if (e.inv > 0) e.inv--; if (e.flash > 0) e.flash--; updateRunner(e); }
+    if (e.runner && (e.raptorRun ? !['hurt', 'fall', 'down', 'dead', 'getup'].includes(e.state) : (e.state === 'idle' || e.state === 'walk'))) { if (e.inv > 0) e.inv--; if (e.flash > 0) e.flash--; if (e.raptorRun) updateRaptorRun(e); else updateRunner(e); }
     else updateEnemy(e);
   }
   updateProjectiles(); updateItems(); updateParticles();
@@ -1231,10 +1227,10 @@ function drawFighter(f) {
   if (f.team === 'hero' && f.inv > 0 && f.state !== 'attack' && (G.t >> 2) % 2) ctx.globalAlpha = 0.55;
   const flash = f.flash > 0 && f.flash % 2 === 1;
   if (f.state === 'drive' || (f.team === 'hero' && G.drive && f.state === 'dead')) {
-    const bounce = Math.sin(G.t * 0.6) * 1.5 + (f.state === 'dead' ? 6 : 0);
+    const bounce = (f.bz || 0) + (f.state === 'dead' ? 6 : 0);
     const pas = HEROES[(G.selIdx + 1) % HEROES.length];
-    if (!drawCarSpr(ctx, sx, f.y + bounce, f.state === 'dead' || f.hp < f.maxHp * 0.35, flash, f.def.id, typeof allyId === 'function' ? allyId() : null)) drawCar(ctx, sx, f.y, 1.55, { t: G.t, bounce, driver: flash ? whiteLook(f.look) : f.look, passenger: pas.look, driverPose: RIDE_POSE, col: f.royal ? '#151515' : '#c0262e' });
-    if (f.boostT > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, sx - 455, f.y - 60, 90, 'rgba(255,160,60,0.7)'); ctx.restore(); }
+    if (!drawCarSpr(ctx, sx, f.y + bounce, f.state === 'dead' || f.hp < f.maxHp * 0.35, flash, f.def.id, typeof allyId === 'function' ? allyId() : null, { spin: f.wheelA || 0, pitch: f.pitch || 0 })) drawCar(ctx, sx, f.y, 1.55, { t: G.t, bounce, driver: flash ? whiteLook(f.look) : f.look, passenger: pas.look, driverPose: RIDE_POSE, col: f.royal ? '#151515' : '#c0262e' });
+
     ctx.restore(); return;
   }
   const spr = spriteFor(f);
@@ -1420,6 +1416,7 @@ function drawWorld() {
       if (!(k === 2 && o.def.flyer && o.z > 40)) waterCut(o.x - G.camX, o.y, w, k === 2 ? o : null);
     }
   }
+  if (G.drive) drawDriveFx(ctx);
   drawParticles();
   if (G.arena) drawArenaTags(ctx);
   drawForeground(ctx, st.theme, G.camX, G.t);

@@ -5,7 +5,7 @@
    Every frame faces right; (ax, ay) is the foot anchor inside the frame.
    The code-drawn art in art.js stays as a fallback while images load.
    ========================================================= */
-const SPRITE_V = 'hd11';   // bump when the art is regenerated, so browsers fetch the new sheets
+const SPRITE_V = 'hd13';   // bump when the art is regenerated, so browsers fetch the new sheets
 const SPR = { img: {}, flash: {}, tint: {}, head: {}, bg: {}, cover: null, loaded: 0, total: 0 };
 
 // sheet names + on-screen height of the reference frame (ref: 0 = stance, 1 = walk)
@@ -159,7 +159,8 @@ function stride(sheet, f, len) {
   const n = window.ATLAS[sheet].length, p = (f.dist || 0) / len * n, i = Math.floor(p), fr = p - i;
   return [sheet, i % n, (i + 1) % n, fr];
 }
-const STRIDE = { hero: 150, run: 175, gang: 150, raptor: 250, rex: 450, trike: 335 };   // grows with the bigger dinosaurs so feet do not slide
+// one full walk cycle (two steps) ≈ 1.5 m for a 1.8 m adult ≈ 250 px, so the feet do not slide
+const STRIDE = { hero: 260, run: 300, gang: 240, raptor: 250, rex: 450, trike: 335 };   // grows with the bigger dinosaurs so feet do not slide
 // pick a frame from a timeline [[untilFrame, sheet, idx], ...]
 function seq(t, list) { for (const s of list) if (t < s[0]) return [s[1], s[2]]; const l = list[list.length - 1]; return [l[1], l[2]]; }
 function heroFrame(f, A, B, C, D) {
@@ -312,11 +313,15 @@ function drawItemSpr(c, kind, x, y, k = itemScale(kind)) {
 // heroes long (CAR_LEN). Seated in an open car you only see head, neck and shoulders above the
 // door: hips sit roughly 0.45 m below the beltline, and the car body hides everything below.
 const CAR_LEN = 910;
-const CAR_SEATS = { driver: { fx: 0.545, fy: 0.58 }, passenger: { fx: 0.385, fy: 0.585 } };
+const CAR_SEATS = { driver: { fx: 0.53, fy: 0.5 }, passenger: { fx: 0.37, fy: 0.5 } };
 const CAR_CREW = {};
-function drawCarSpr(c, x, y, damaged, flash, driver, passenger) {
+const SEAT_H = 0.8, SEAT_HIP = [0.3, 0.56];   // seated-figure height vs standing; hip point in the seated painting
+function drawCarSpr(c, x, y, damaged, flash, driver, passenger, o = {}) {
   if (has('car_park')) {
     const fr = window.ATLAS.car_park[damaged ? 1 : 0], k = CAR_LEN / fr.w, left = x - fr.ax * k, top = y - fr.ay * k;
+    // body pitch (nose up under power, down under braking) pivots on the rear wheel
+    c.save();
+    if (o.pitch) { const px = left + fr.w * k * CAR_WHEELS[0].fx, py = top + fr.h * k * CAR_WHEELS[0].fy; c.translate(px, py); c.rotate(o.pitch); c.translate(-px, -py); }
     for (const [id, seat] of [[passenger, 'passenger'], [driver, 'driver']]) {
       if (!id) continue;
       const sx = left + fr.w * k * CAR_SEATS[seat].fx, sy = top + fr.h * k * CAR_SEATS[seat].fy;
@@ -326,6 +331,15 @@ function drawCarSpr(c, x, y, damaged, flash, driver, passenger) {
         // keep legs hidden even where the painted door is low: only draw above the car floor
         c.save(); c.beginPath(); c.rect(sx - 200, top - 400, 400, fr.h * k * 0.74 + 400); c.clip();
         drawRig(c, f, sx, sy, 1, { flash, seat: true });
+        c.restore();
+      } else if (has(id + '_s')) {
+        // painted seated pose: 0 = driving (hands on the wheel), 1 = riding (elbow on the door).
+        // A seated adult is ~72% of standing height; hips sit ~55% down the figure, a third in from its back.
+        const sh = id + '_s', idx = seat === 'driver' ? 0 : 1, sf = window.ATLAS[sh][idx], d = SPRITE_DEFS[id];
+        const kk = (d.h * SEAT_H) / sf.h, sway = Math.sin(G.t * 0.09 + (seat === 'driver' ? 0 : 1.7)) * 1.2;
+        const hipX = sf.w * SEAT_HIP[0], hipY = sf.h * SEAT_HIP[1];
+        c.save(); c.beginPath(); c.rect(sx - 300, top - 400, 600, fr.h * k * 0.74 + 400); c.clip();
+        drawSprite(c, sh, idx, sx + (sf.ax - hipX) * kk, sy + (sf.ay - hipY) * kk + sway, 1, kk, { flash });
         c.restore();
       } else {
         // whole-body painting at its normal in-game size, lowered until the hips (about half the
@@ -337,7 +351,29 @@ function drawCarSpr(c, x, y, damaged, flash, driver, passenger) {
         c.restore();
       }
     }
-    return drawSprite(c, 'car_park', damaged ? 1 : 0, x, y, 1, k, { flash });
+    drawSprite(c, 'car_park', damaged ? 1 : 0, x, y, 1, k, { flash });
+    // wheels that turn: each tire is re-drawn from the painting, rotated about its hub
+    if (o.spin !== undefined && !damaged) {
+      const im = flash ? SPR.flash.car_park : SPR.img.car_park;
+      if (im) for (const w of CAR_WHEELS) {
+        // both hubs are copied from the front wheel, which is fully visible (the rear one hides under a skirt)
+        const F = CAR_WHEELS[1], cx = left + fr.w * k * w.fx, cy = top + fr.h * k * w.fy, r = CAR_LEN * w.r, sx = fr.x + fr.w * F.fx, sy = fr.y + fr.h * F.fy, sr = fr.w * F.r;
+        // only the hubcap and spokes turn (the round whitewall looks the same at any angle, and the
+        // top of the tire sits under the wheel arch); a little motion blur at speed
+        const hr = r * 0.62;
+        c.save(); c.beginPath(); c.arc(cx, cy, hr, 0, TAU); c.clip();
+        if (w.skirt) { const sy2 = top + fr.h * k * w.skirt; c.beginPath(); c.rect(cx - hr, sy2, hr * 2, hr * 2); c.clip(); }
+        c.translate(cx, cy);
+        for (const [da, al] of [[0, 1], [-0.12, 0.35], [-0.24, 0.18]]) {
+          c.save(); c.globalAlpha *= al; c.rotate(o.spin + da);
+          c.drawImage(im, sx - sr * 0.62, sy - sr * 0.62, sr * 1.24, sr * 1.24, -hr, -hr, hr * 2, hr * 2);
+          c.restore();
+        }
+        c.restore();
+      }
+    }
+    c.restore();
+    return true;
   }
   if (!spritesReady('car')) return false;
   const fr = window.ATLAS.car[0];

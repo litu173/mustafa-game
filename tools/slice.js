@@ -16,7 +16,10 @@ const SHEETS = {
   razor: 8, motka: 8, poacher: 8, biker: 8, lash: 8, butcher: 8, saju: 8, morgol: 8, kaiser: 8, mutant: 8,
   raptor: 8, rex: 8, trike: 6, ptera: 6, car: 2, hog: 5, items: 18,
   // smooth-animation sheets (0 = detect the number of poses automatically)
-  mustafa_c: 9, mustafa_d: 8, rakib_c: 0, rakib_d: 8, nadia_c: 0, nadia_d: 8, bablu_c: 9, bablu_d: 8,
+  // _c: 8-pose walk (contact, down, passing, up for each leg, arms swinging opposite)
+  mustafa_c: 8, mustafa_d: 8, rakib_c: 8, rakib_d: 8, nadia_c: 8, nadia_d: 8, bablu_c: 8, bablu_d: 8,
+  // _s: seated in the Cadillac — 0 driving (hands on the wheel), 1 riding as a passenger
+  mustafa_s: 2, rakib_s: 2, nadia_s: 2, bablu_s: 2,
   razor_w: 8, motka_w: 8, poacher_w: 8, biker_w: 8, lash_w: 8, raptor_r: 8,
   rex_w: 8, trike_w: 8, ptera_f: 8, car_park: 2,
 };
@@ -239,6 +242,9 @@ function sliceSheet(name, count) {
     ox += f.w + 2;
   }
   writePNG(path.join(OUT, name + '.png'), atlasW, atlasH, atlas);
+  // the game loads the WebP first, so it must always be rebuilt alongside the PNG
+  try { require('child_process').execFileSync('cwebp', ['-quiet', '-q', '86', '-alpha_q', '95', path.join(OUT, name + '.png'), '-o', path.join(OUT, name + '.webp')]); }
+  catch (e) { console.warn('  cwebp failed for', name, e.message); }
   return meta;
 }
 function nearOwn(lab, ids, w, h, x, y) {

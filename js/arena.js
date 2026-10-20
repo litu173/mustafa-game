@@ -103,7 +103,7 @@ function arenaLost(p) {   // only ever called for my own fighter
   if (p.stock > 0) {
     p.hp = p.lagHp = p.maxHp; p.koed = false; p.move = null; p.inv = 180; p.weapon = null;
     p.x = clamp(G.camX + rand(200, W - 200), 200, ARENA_W - 200); p.y = rand(BELT_TOP + 20, BELT_BOT - 20); p.z = 700; p.vz = 0; p.setState('drop');
-  } else { p.setState('out'); p.z = 0; Sound.play('ko'); }
+  } else { p.setState('out'); p.z = 0; G.arena.lastOut = p; }   // the finish (K.O. + fanfare) plays when the match ends
 }
 function creditKO(by, victim) {
   const killer = fighterById(by);
@@ -122,7 +122,7 @@ function onArenaRelay(from, d) {
         damage(me, f, d.dmg, { ...d.m, dir: d.dir });
       } else { const t = fighterById(d.to); if (t) hitFx(t, d.dir, d.dmg, d.m.down); }
       break;
-    case 'ko': if (f) { if (d.by === a.me && me) me.kills++; else popText(f.x, f.y, 360, 'K.O.!', '#ffd56b', 56); } break;
+    case 'ko': if (f) { a.lastOut = f; if (d.by === a.me && me) me.kills++; else popText(f.x, f.y, 360, 'K.O.!', '#ffd56b', 56); } break;
     case 'ex': explodeFx(d.x, d.y, d.z, d.r); Sound.play('boom'); break;
     case 'pj': G.projs.push({ ...d.p, remote: true, owner: f, team: 'hero' }); break;
     case 'pjx': G.projs = G.projs.filter(b => !(b.remote && b.id === d.id)); break;
@@ -174,7 +174,7 @@ function arenaUpdate() {
   if (G.flash > 0) G.flash--;
   if (G.banner && ++G.banner.t > G.banner.dur) G.banner = null;
   updateRemotes();
-  if (a.ended) { a.endT++; updateParticles(); updateArenaCamera(); if (a.endT > 60 * 7) endArena(); return; }
+  if (a.ended) { a.endT++; updateParticles(); updateArenaCamera(); if (a.endT > 60 * 7 + (a.koDelay || 0)) endArena(); return; }
   a.time++; G.stageTime++;
   pulseDanger(myFighter && myFighter());
   const me = myFighter();
@@ -221,7 +221,7 @@ function checkArenaWin() {
     winner = Object.entries(score).sort((x, y) => y[1] - x[1])[0][0];
   }
   const result = {
-    winnerSide: winner, mode: a.mode, teamNames: a.teamNames,
+    winnerSide: winner, mode: a.mode, teamNames: a.teamNames, ko: !(timeUp && sides.size > 1) && alive.length > 0,
     winners: G.players.filter(p => p.side === winner).map(p => p.name),
     stats: G.players.map(p => ({ id: p.netId, name: p.name, side: p.side, kills: p.kills, deaths: p.deaths, hero: p.def.id })),
   };
@@ -230,9 +230,15 @@ function checkArenaWin() {
 }
 function showArenaResult(result) {
   const a = G.arena; if (!a || a.ended) return;
-  a.ended = true; a.endT = 0; a.result = result;
+  a.ended = true; a.endT = 0; a.result = result; a.koDelay = 0;
   const iWon = G.players.some(p => p.netId === a.me && p.side === result.winnerSide);
-  Music.play('victory'); Sound.play(iWon ? 'fanfare' : 'over');
+  // won by knockout: the same big finish as the story missions, then the result panel
+  const loser = result.ko && ((a.lastOut && a.lastOut.side !== result.winnerSide && a.lastOut) || G.players.find(p => p.side !== result.winnerSide && p.state === 'out'));
+  Music.play('victory');
+  if (loser) {
+    const who = result.mode === 'team' ? ((result.teamNames && result.teamNames[result.winnerSide]) || 'TEAM ' + result.winnerSide) : result.winners.join(' & ');
+    bigKO(loser, (who + ' WINS').toUpperCase()); a.koDelay = 150;
+  } else Sound.play(iWon ? 'fanfare' : 'over');
   const me = myFighter();
   if (me && me.side === result.winnerSide && me.state !== 'out') { me.move = null; me.z = 0; me.setState('win'); }
 }
@@ -328,7 +334,7 @@ function drawArenaHUD(c) {
   else txt(c, 'Esc: leave match', W - 20, H - 14, { font: '600 13px Cinzel, serif', align: 'right', fill: 'rgba(240,220,180,0.6)' });
 }
 function drawArenaResult(c, r) {
-  const k = G.arena.endT;
+  const k = G.arena.endT - (G.arena.koDelay || 0); if (k < 0) return;   // let the K.O. finish play first
   c.fillStyle = `rgba(0,0,0,${Math.min(0.6, k / 40)})`; c.fillRect(0, 0, W, H);
   const iWon = G.players.some(p => p.netId === G.arena.me && p.side === r.winnerSide);
   const s = 1 + Math.max(0, 0.5 - k / 30);
